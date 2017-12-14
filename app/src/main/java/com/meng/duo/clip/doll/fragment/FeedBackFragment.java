@@ -131,6 +131,7 @@ public class FeedBackFragment extends BaseFragment implements View.OnFocusChange
                             JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
                             if (code == 1) {
                                 ToastUtils.showShort("提交成功！");
+                                et_put_feed_back.setText("");
                             } else {
                                 LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
                                 ToastUtils.showShort("请求数据失败:" + msg);

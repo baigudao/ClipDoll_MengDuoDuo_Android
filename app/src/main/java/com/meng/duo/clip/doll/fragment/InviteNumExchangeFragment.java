@@ -74,7 +74,6 @@ public class InviteNumExchangeFragment extends BaseFragment {
         et_invite_num2.setOnClickListener(this);
         et_invite_num2.addTextChangedListener(watcher);
 
-
         et_invite_num3 = (EditText) view.findViewById(R.id.et_invite_num3);
         handlerEditTextStatus(false, et_invite_num3);
         et_invite_num3.setOnClickListener(this);
@@ -226,7 +225,7 @@ public class InviteNumExchangeFragment extends BaseFragment {
                                 }
                             } else {
                                 LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
-                                ToastUtils.showShort("请求数据失败:" + msg);
+                                ToastUtils.showShort("" + msg);
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();

@@ -187,10 +187,10 @@ public class NewAddAddressActivity extends BaseActivity implements View.OnClickL
     }
 
     private void saveAddress() {
-        //        if (!RegexUtils.isMobileExact(getPhone())) {
-        //            ToastUtils.showShort("请输入正确的手机号码");
-        //            return;
-        //        }
+        if (!RegexUtils.isMobileExact(getPhone())) {
+            ToastUtils.showShort("请输入正确的手机号码");
+            return;
+        }
         OkHttpUtils.post()
                 .url(Constants.getUserAddressSaveUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))

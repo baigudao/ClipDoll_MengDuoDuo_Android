@@ -11,7 +11,6 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.blankj.utilcode.util.EmptyUtils;
-import com.blankj.utilcode.util.SPUtils;
 import com.blankj.utilcode.util.ScreenUtils;
 import com.blankj.utilcode.util.SizeUtils;
 import com.blankj.utilcode.util.TimeUtils;
@@ -24,7 +23,6 @@ import com.meng.duo.clip.doll.bean.LiveRoomLuckyUserBean;
 import com.meng.duo.clip.doll.bean.MessageNotificationBean;
 import com.meng.duo.clip.doll.bean.SpendCoinRecordBean;
 import com.meng.duo.clip.doll.bean.WaitingSendBean;
-import com.meng.duo.clip.doll.util.Constants;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -46,6 +44,7 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
     private static final int WAITING_SEND_DATA_TYPE = 5;
     private static final int CLIP_DOLL_RECORD_USER_DATA_TYPE = 6;
     private static final int PRODUCT_INTRODUCE_DATA_TYPE = 7;
+    private static final int SEND_OVER_DATA_TYPE = 8;
     private static final int NOTIFICATION_CENTER_DATA_TYPE = 16;
 
     private Context mContext;
@@ -92,6 +91,9 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
                 break;
             case WAITING_SEND_DATA_TYPE:
                 viewHolder = new ViewHolder(View.inflate(mContext, R.layout.item_view_waiting_send, null));
+                break;
+            case SEND_OVER_DATA_TYPE:
+                viewHolder = new ViewHolder(View.inflate(mContext, R.layout.item_view_send_over, null));
                 break;
             case CLIP_DOLL_RECORD_USER_DATA_TYPE:
                 viewHolder = new ViewHolder(View.inflate(mContext, R.layout.item_view_clip_doll_record_user, null));
@@ -143,11 +145,11 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
                     ClipDollRecordBean clipDollRecordBean = clipDollRecordBeanArrayList.get(position);
                     if (EmptyUtils.isNotEmpty(clipDollRecordBean)) {
                         Glide.with(mContext)
-                                .load(SPUtils.getInstance().getString(Constants.HEADIMG))
+                                .load(clipDollRecordBean.getToyPicUrl())
                                 .placeholder(R.drawable.avatar)
                                 .error(R.drawable.avatar)
                                 .into(holder.iv_item1);
-                        holder.tv_item1.setText(SPUtils.getInstance().getString(Constants.NICKNAME));
+                        holder.tv_item1.setText(clipDollRecordBean.getToyName());
                         holder.tv_item2.setText(clipDollRecordBean.getCreateTime());
                         int result = clipDollRecordBean.getResult();
                         if (result == 1) {
@@ -180,17 +182,17 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
                 }
                 break;
             case CLIP_DOLL_RECORD_USER_DATA_TYPE:
-                ArrayList<GuestStateClipDollInfoBean> liveRoomLuckyUserBeanList = (ArrayList<GuestStateClipDollInfoBean>) mList;
-                if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBeanList)) {
-                    final GuestStateClipDollInfoBean liveRoomLuckyUserBean = liveRoomLuckyUserBeanList.get(position);
-                    if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBean)) {
+                ArrayList<GuestStateClipDollInfoBean> guestStateClipDollInfoBeen = (ArrayList<GuestStateClipDollInfoBean>) mList;
+                if (EmptyUtils.isNotEmpty(guestStateClipDollInfoBeen)) {
+                    final GuestStateClipDollInfoBean guestStateClipDollInfoBean = guestStateClipDollInfoBeen.get(position);
+                    if (EmptyUtils.isNotEmpty(guestStateClipDollInfoBean)) {
                         Glide.with(mContext)
-                                .load(liveRoomLuckyUserBean.getToyPicUrl())
+                                .load(guestStateClipDollInfoBean.getToyPicUrl())
                                 .placeholder(R.drawable.wawa_default0)
                                 .error(R.drawable.wawa_default0)
                                 .into(holder.iv_item1);
-                        holder.tv_item1.setText(liveRoomLuckyUserBean.getToyName());
-                        holder.tv_item2.setText(liveRoomLuckyUserBean.getCreateTime());
+                        holder.tv_item1.setText(guestStateClipDollInfoBean.getToyName());
+                        holder.tv_item2.setText(guestStateClipDollInfoBean.getCreateTime());
                     }
                 }
                 break;
@@ -252,6 +254,21 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
                 ArrayList<WaitingSendBean> waitingSendBeanArrayList = (ArrayList<WaitingSendBean>) mList;
                 if (EmptyUtils.isNotEmpty(waitingSendBeanArrayList)) {
                     WaitingSendBean waitingSendBean = waitingSendBeanArrayList.get(position);
+                    if (EmptyUtils.isNotEmpty(waitingSendBean)) {
+                        Glide.with(mContext)
+                                .load(waitingSendBean.getToyPicUrl())
+                                .placeholder(R.drawable.avatar)
+                                .error(R.drawable.avatar)
+                                .into(holder.iv_item1);
+                        holder.tv_item1.setText(waitingSendBean.getToyName());
+                        holder.tv_item2.setText(waitingSendBean.getNum() + "个");
+                    }
+                }
+                break;
+            case SEND_OVER_DATA_TYPE:
+                ArrayList<WaitingSendBean> waitingSendBeanArrayList_ = (ArrayList<WaitingSendBean>) mList;
+                if (EmptyUtils.isNotEmpty(waitingSendBeanArrayList_)) {
+                    WaitingSendBean waitingSendBean = waitingSendBeanArrayList_.get(position);
                     if (EmptyUtils.isNotEmpty(waitingSendBean)) {
                         Glide.with(mContext)
                                 .load(waitingSendBean.getToyPicUrl())
@@ -426,6 +443,22 @@ public class BaseRecyclerViewAdapter<T> extends RecyclerView.Adapter<BaseRecycle
                     });
                     break;
                 case WAITING_SEND_DATA_TYPE:
+                    iv_item1 = (ImageView) itemView.findViewById(R.id.iv_user_photo);
+
+                    tv_item1 = (TextView) itemView.findViewById(R.id.tv_clip_doll_name);
+                    tv_item2 = (TextView) itemView.findViewById(R.id.tv_clip_doll_num);
+
+                    itemView.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if (mOnItemClickListener != null) {
+                                int position = getLayoutPosition();
+                                mOnItemClickListener.onItemClick(mList.get(position), position);
+                            }
+                        }
+                    });
+                    break;
+                case SEND_OVER_DATA_TYPE:
                     iv_item1 = (ImageView) itemView.findViewById(R.id.iv_user_photo);
 
                     tv_item1 = (TextView) itemView.findViewById(R.id.tv_clip_doll_name);

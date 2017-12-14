@@ -1,5 +1,6 @@
 package com.meng.duo.clip.doll.fragment;
 
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -8,8 +9,12 @@ import com.blankj.utilcode.util.EmptyUtils;
 import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.SPUtils;
 import com.blankj.utilcode.util.ToastUtils;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.meng.duo.clip.doll.R;
 import com.meng.duo.clip.doll.activity.MainActivity;
+import com.meng.duo.clip.doll.adapter.BaseRecyclerViewAdapter;
+import com.meng.duo.clip.doll.bean.WaitingSendBean;
 import com.meng.duo.clip.doll.util.Constants;
 import com.zhy.http.okhttp.OkHttpUtils;
 import com.zhy.http.okhttp.callback.StringCallback;
@@ -17,6 +22,8 @@ import com.zhy.http.okhttp.callback.StringCallback;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
 
 import okhttp3.Call;
 
@@ -29,6 +36,8 @@ public class SendOverFragment extends BaseFragment {
 
     private RecyclerView recyclerView;
     private LinearLayout ll_no_data;
+
+    private static final int SEND_OVER_DATA_TYPE = 8;
 
     @Override
     protected int getLayoutId() {
@@ -98,7 +107,14 @@ public class SendOverFragment extends BaseFragment {
             if (jsonArray.length() > 0) {
                 ll_no_data.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.VISIBLE);
-
+                Gson gson = new Gson();
+                ArrayList<WaitingSendBean> waitingSendBeanArrayList = gson.fromJson(jsonArray.toString(), new TypeToken<ArrayList<WaitingSendBean>>() {
+                }.getType());
+                if (EmptyUtils.isNotEmpty(waitingSendBeanArrayList)) {
+                    BaseRecyclerViewAdapter baseRecyclerViewAdapter = new BaseRecyclerViewAdapter(mContext, waitingSendBeanArrayList, SEND_OVER_DATA_TYPE);
+                    recyclerView.setAdapter(baseRecyclerViewAdapter);
+                    recyclerView.setLayoutManager(new LinearLayoutManager(mContext, LinearLayoutManager.VERTICAL, false));
+                }
             } else {
                 ll_no_data.setVisibility(View.VISIBLE);
                 recyclerView.setVisibility(View.GONE);

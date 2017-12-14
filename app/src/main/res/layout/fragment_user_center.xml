@@ -160,7 +160,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="20dp"
                     android:layout_toRightOf="@id/iv_game_coin"
-                    android:text="我的游戏币"
+                    android:text="我的娃娃币"
                     android:textColor="@color/main_text_color"
                     android:textSize="18sp"/>
 

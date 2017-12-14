@@ -115,8 +115,12 @@
             android:exported="true"
             android:process=":remote"/>
 
-        <meta-data android:value="5a30f7be8f4a9d1a1a000038" android:name="UMENG_APPKEY"/>
-        <meta-data android:value="Channel ID" android:name="UMENG_CHANNEL"/>
+        <meta-data
+            android:name="UMENG_APPKEY"
+            android:value="5a30f7be8f4a9d1a1a000038"/>
+        <meta-data
+            android:name="UMENG_CHANNEL"
+            android:value="${CHANNEL_VALUE}"/>
 
     </application>
 

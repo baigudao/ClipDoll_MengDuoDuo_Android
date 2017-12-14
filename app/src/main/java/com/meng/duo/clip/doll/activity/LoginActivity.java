@@ -8,12 +8,16 @@ import android.widget.LinearLayout;
 
 import com.blankj.utilcode.util.BarUtils;
 import com.blankj.utilcode.util.EmptyUtils;
+import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.SPUtils;
 import com.blankj.utilcode.util.ToastUtils;
 import com.meng.duo.clip.doll.R;
 import com.meng.duo.clip.doll.fragment.UserProtocolFragment;
 import com.meng.duo.clip.doll.util.Constants;
 import com.rey.material.widget.CheckBox;
+import com.tencent.android.tpush.XGIOperateCallback;
+import com.tencent.android.tpush.XGPushConfig;
+import com.tencent.android.tpush.XGPushManager;
 import com.tencent.mm.opensdk.modelmsg.SendAuth;
 import com.tencent.mm.opensdk.openapi.IWXAPI;
 import com.tencent.mm.opensdk.openapi.WXAPIFactory;
@@ -54,8 +58,8 @@ public class LoginActivity extends BaseActivity implements View.OnClickListener,
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.ll_weixin_login:
-                                wxLogin();
-//                test();
+                //                wxLogin();
+                test();
                 break;
             case R.id.tv_user_protocol:
                 gotoPager(UserProtocolFragment.class, null);
@@ -93,16 +97,18 @@ public class LoginActivity extends BaseActivity implements View.OnClickListener,
 
 
     private void test() {
-        JSONObject jsonObjectTicketAndUserId = getJsonData("Ga+iVFHxtrcURHJE/dsZ1OIvWORg51u8a5CmfT9/388=", 1000014);
+        JSONObject jsonObjectTicketAndUserId = getJsonData("nvsQRv269/fexiLcCnr+cdXELOi8wWQKnKUVmjuB+4U=", 1000030);
         //存储ticket和userId
         SPUtils.getInstance().put(Constants.SESSION, jsonObjectTicketAndUserId.toString());
         //存储sig
-        SPUtils.getInstance().put(Constants.TLSSIGN, "eJxFkN1Og0AQRt*F2xrdX1JMvEBEQqAqwdbqzWbtLs3YSOmyJdim7*4WS8zcnZPJfN8cvde8vJZNA0pIK6hR3q2HvKsB674Bo4WsrDYOY845QWi0nTYtbGsnCMIcE4rQvwSlawsV-C2eBWYX1cLasVk8j9LHXhUHnzQLiabRLgJ1KIKyVA-Jl4Gkq7Nq8mHSPEzeFjKEOOzbdM7aeBlM3y3uNjIL-Or*xV-vPvc37DkvnqqJnSU4SzN2Nx5TGzG0O8dgLgZnlIxJLHzroRembhjlFy5Xq*2*tsL*NHp4x*kXLThWQA__");
+        SPUtils.getInstance().put(Constants.TLSSIGN, "eJxFkF1vgjAYhf8L18tsKQVd4gV*xS0sAxzRcUMKbV3dhFpqgzH776tMstvnyZtzznt13qPNI5FS0ILoAinqPDnAeegx66RQrCBcM2UxxBi7AAzWMNWKprbCBRBDFwHwLwVltRZc-B3eBBpUK-aWvS6T*fNi7sfKj8u30RhvePn9wvPKpCYrV1o2XhS39ET2eRfAHQhFKFKWH9ddep5wmJnD8jMxWSTxx3gdjE7RdpasaHrZhYdtEE6nQxj9Kvp1txqerYE95Hp3qcWR9bugZT6aBHdOqqo517rQF8n6d-z8AmlSVv0_");
         //存储第三方微信登录返回的用户信息
-        SPUtils.getInstance().put(Constants.HEADIMG, "https://images.pexels.com/photos/247206/pexels-photo-247206.jpeg?h=350&auto=compress&cs=tinysrgb");
+        SPUtils.getInstance().put(Constants.HEADIMG, "http://m.qulishi.com/UploadFile/2015-3/2015310172554.jpg");
         SPUtils.getInstance().put(Constants.INVITECODE, "YXMGHD");
         SPUtils.getInstance().put(Constants.NICKNAME, "测试账号1");
-        SPUtils.getInstance().put(Constants.USERID, 1000014);
+        SPUtils.getInstance().put(Constants.USERID, 1000030);
+
+        configXGPush();
 
         //存储登录状态
         if (EmptyUtils.isNotEmpty(SPUtils.getInstance().getString(Constants.SESSION))) {
@@ -111,6 +117,23 @@ public class LoginActivity extends BaseActivity implements View.OnClickListener,
         gotoPager(MainActivity.class, null);
         finish();
         ToastUtils.showShort(R.string.login_successful);
+    }
+
+    private void configXGPush() {
+        XGPushConfig.enableDebug(this, true);
+        XGPushManager.setTag(this, "XINGE");
+        XGPushManager.registerPush(this, String.valueOf(SPUtils.getInstance().getInt(Constants.USERID)), new XGIOperateCallback() {
+            @Override
+            public void onSuccess(Object o, int i) {
+                LogUtils.e("注册成功，设备token为：" + o);
+                LogUtils.e("id: " + String.valueOf(SPUtils.getInstance().getInt(Constants.USERID)));
+            }
+
+            @Override
+            public void onFail(Object o, int i, String s) {
+                LogUtils.e("注册失败，错误码：" + i + ",错误信息：" + s);
+            }
+        });
     }
 
     public JSONObject getJsonData(String ticket, int userId) {

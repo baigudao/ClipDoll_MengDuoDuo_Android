@@ -34,7 +34,6 @@ import com.meng.duo.clip.doll.adapter.BaseRecyclerViewAdapter;
 import com.meng.duo.clip.doll.bean.HomeRoomBean;
 import com.meng.duo.clip.doll.bean.LiveRoomLuckyUserBean;
 import com.meng.duo.clip.doll.bean.LiveRoomUserBean;
-import com.meng.duo.clip.doll.fragment.GuestStateFragment;
 import com.meng.duo.clip.doll.fragment.InvitePrizeFragment;
 import com.meng.duo.clip.doll.fragment.MyGameCoinFragment;
 import com.meng.duo.clip.doll.util.BackgroundMusicPlayerUtil;
@@ -270,7 +269,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         OkHttpUtils.get()
                 .url(Constants.getAddUserForLiveRoomUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, SPUtils.getInstance().getString(Constants.GROUPID))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -950,7 +949,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         OkHttpUtils.get()
                 .url(Constants.getLiveRoomUserUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, SPUtils.getInstance().getString(Constants.GROUPID))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -981,6 +980,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                     if (EmptyUtils.isNotEmpty(jsonObjectUser)) {
                                                         ll_live_room_player.setVisibility(View.VISIBLE);
                                                         String headImg = jsonObjectUser.optString("headImg");
+                                                        LogUtils.e("玩家的图像地址：" + headImg);
                                                         Glide.with(ClipDollDetailActivity.this)
                                                                 .load(headImg)
                                                                 .placeholder(R.drawable.wawa_default_user)
@@ -1127,7 +1127,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         OkHttpUtils.get()
                 .url(Constants.getRemoveUserForLiveRoomUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, SPUtils.getInstance().getString(Constants.GROUPID))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -1167,6 +1167,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         ILVLiveManager.getInstance().onDestory();
         releaseResource();
         Glide.with(getApplicationContext()).pauseRequests();
+        roomStateTimer = null;//取消房间的状态轮询
         super.onDestroy();
     }
 
@@ -1211,7 +1212,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             if (isShowGoBackDialog) {
                 showGoBackDialog();
             }
-            releaseResource();
         }
         return super.onKeyDown(keyCode, event);
     }
@@ -1232,7 +1232,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         OkHttpUtils.post()
                 .url(Constants.getGameOverUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, SPUtils.getInstance().getString(Constants.GROUPID))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -1515,8 +1515,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBean)) {
                 LiveRoomLuckyUserBean.UserBean userBean = liveRoomLuckyUserBean.getUser();
                 if (EmptyUtils.isNotEmpty(userBean)) {
-                    DataManager.getInstance().setData1(liveRoomLuckyUserBean.getUser());
-                    gotoPager(GuestStateFragment.class, null);
+                    //                    DataManager.getInstance().setData1(liveRoomLuckyUserBean.getUser());
+                    //                    gotoPager(GuestStateFragment.class, null);
                 }
             }
         }

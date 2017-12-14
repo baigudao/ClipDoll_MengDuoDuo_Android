@@ -114,9 +114,9 @@
                     android:layout_marginBottom="20dp"
                     android:layout_marginLeft="15dp"
                     android:layout_marginRight="15dp"
+                    android:background="@drawable/wawa_default1"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
-                    android:src="@drawable/wawa_default1"
                     app:layout_behavior="@string/appbar_scrolling_view_behavior"
                     app:layout_scrollFlags="scroll"/>
 

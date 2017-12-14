@@ -23,6 +23,9 @@ import com.meng.duo.clip.doll.activity.MainActivity;
 import com.meng.duo.clip.doll.bean.UserInfo;
 import com.meng.duo.clip.doll.util.Constants;
 import com.meng.duo.clip.doll.util.DataManager;
+import com.tencent.android.tpush.XGIOperateCallback;
+import com.tencent.android.tpush.XGPushConfig;
+import com.tencent.android.tpush.XGPushManager;
 import com.tencent.mm.opensdk.modelbase.BaseReq;
 import com.tencent.mm.opensdk.modelbase.BaseResp;
 import com.tencent.mm.opensdk.modelmsg.SendAuth;
@@ -157,6 +160,9 @@ public class WXEntryActivity extends BaseActivity implements IWXAPIEventHandler 
                                     SPUtils.getInstance().put(Constants.USERID, userInfo.getUserId());
                                     DataManager.getInstance().setUserInfo(userInfo);
 
+                                    //配置信鸽推送
+                                    configXGPush();
+
                                     //存储登录状态
                                     if (EmptyUtils.isNotEmpty(SPUtils.getInstance().getString(Constants.SESSION))) {
                                         SPUtils.getInstance().put(Constants.IS_USER_LOGIN, true);
@@ -200,5 +206,22 @@ public class WXEntryActivity extends BaseActivity implements IWXAPIEventHandler 
                 + "&code="
                 + code
                 + "&grant_type=authorization_code";
+    }
+
+    private void configXGPush() {
+        XGPushConfig.enableDebug(this, true);
+        XGPushManager.setTag(this, "XINGE");
+        XGPushManager.registerPush(this, String.valueOf(SPUtils.getInstance().getInt(Constants.USERID)), new XGIOperateCallback() {
+            @Override
+            public void onSuccess(Object o, int i) {
+                LogUtils.e("注册成功，设备token为：" + o);
+                LogUtils.e("id: " + String.valueOf(SPUtils.getInstance().getInt(Constants.USERID)));
+            }
+
+            @Override
+            public void onFail(Object o, int i, String s) {
+                LogUtils.e("注册失败，错误码：" + i + ",错误信息：" + s);
+            }
+        });
     }
 }

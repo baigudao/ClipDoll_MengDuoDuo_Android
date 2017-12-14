@@ -4,14 +4,16 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.blankj.utilcode.util.EmptyUtils;
 import com.blankj.utilcode.util.LogUtils;
+import com.blankj.utilcode.util.ScreenUtils;
+import com.blankj.utilcode.util.SizeUtils;
 import com.blankj.utilcode.util.ToastUtils;
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.meng.duo.clip.doll.R;
@@ -45,9 +47,10 @@ public class GuestStateFragment extends BaseFragment {
     private TextView tv_clip_doll_num;
     private LiveRoomLuckyUserBean.UserBean userBean;
 
-    private ImageView iv_user_photo;
+    private ImageView iv_user_photo_;
     private TextView tv_user_name;
     private TextView tv_id_num;
+    private ArrayList<GuestStateClipDollInfoBean> liveRoomLuckyUserBeanArrayList;
 
     @Override
     protected int getLayoutId() {
@@ -62,7 +65,7 @@ public class GuestStateFragment extends BaseFragment {
 
         recyclerView = (RecyclerView) view.findViewById(R.id.recyclerView);
 
-        iv_user_photo = (ImageView) view.findViewById(R.id.iv_user_photo);
+        iv_user_photo_ = (ImageView) view.findViewById(R.id.iv_user_photo_);
         tv_user_name = (TextView) view.findViewById(R.id.tv_user_name);
         tv_id_num = (TextView) view.findViewById(R.id.tv_id_num);
 
@@ -92,7 +95,7 @@ public class GuestStateFragment extends BaseFragment {
                         .load(headImage)
                         .placeholder(R.drawable.avatar)
                         .error(R.drawable.avatar)
-                        .into(iv_user_photo);
+                        .into(iv_user_photo_);
             }
             tv_user_name.setText(userBean.getNickName());
             tv_id_num.setText("ID:" + userBean.getUserId());
@@ -146,14 +149,64 @@ public class GuestStateFragment extends BaseFragment {
             JSONArray jsonArrayForLuckyUsers = jsonObjectResBody.optJSONArray("pageData");
             if (EmptyUtils.isNotEmpty(jsonArrayForLuckyUsers)) {
                 Gson gson = new Gson();
-                ArrayList<GuestStateClipDollInfoBean> liveRoomLuckyUserBeanArrayList = gson.fromJson(jsonArrayForLuckyUsers.toString()
+                liveRoomLuckyUserBeanArrayList = gson.fromJson(jsonArrayForLuckyUsers.toString()
                         , new TypeToken<ArrayList<GuestStateClipDollInfoBean>>() {
                         }.getType());
                 if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBeanArrayList) && liveRoomLuckyUserBeanArrayList.size() != 0) {
+                    //                    GuestStateRecyclerViewAdapter guestStateRecyclerViewAdapter = new GuestStateRecyclerViewAdapter();
                     BaseRecyclerViewAdapter baseRecyclerViewAdapter = new BaseRecyclerViewAdapter(mContext, liveRoomLuckyUserBeanArrayList, CLIP_DOLL_RECORD_USER_DATA_TYPE);
                     recyclerView.setAdapter(baseRecyclerViewAdapter);
                     recyclerView.setLayoutManager(new GridLayoutManager(mContext, 2, LinearLayoutManager.VERTICAL, false));
                 }
+            }
+        }
+    }
+
+    private class GuestStateRecyclerViewAdapter extends RecyclerView.Adapter<GuestStateRecyclerViewAdapter.ViewHolder> {
+
+        @Override
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View itemView = View.inflate(mContext, R.layout.item_view_clip_doll_record_user, null);
+            return new ViewHolder(itemView);
+        }
+
+        @Override
+        public void onBindViewHolder(final ViewHolder holder, final int position) {
+            GuestStateClipDollInfoBean guestStateClipDollInfoBean = liveRoomLuckyUserBeanArrayList.get(position);
+            if (EmptyUtils.isNotEmpty(guestStateClipDollInfoBean)) {
+                Glide.with(mContext)
+                        .load(guestStateClipDollInfoBean.getToyPicUrl())
+                        .placeholder(R.drawable.wawa_default0)
+                        .error(R.drawable.wawa_default0)
+                        .into(holder.iv_clip_doll);
+                holder.tv_clip_doll_name.setText(guestStateClipDollInfoBean.getToyName());
+                holder.tv_clip_doll_time.setText(guestStateClipDollInfoBean.getCreateTime());
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return liveRoomLuckyUserBeanArrayList == null ? 0 : liveRoomLuckyUserBeanArrayList.size();
+        }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            private TextView tv_clip_doll_name;
+            private TextView tv_clip_doll_time;
+
+            private ImageView iv_clip_doll;
+
+            ViewHolder(View itemView) {
+                super(itemView);
+                int size_user = (ScreenUtils.getScreenWidth() - SizeUtils.dp2px(90)) / 2;
+
+                iv_clip_doll = (ImageView) itemView.findViewById(R.id.iv_clip_doll);
+                ViewGroup.LayoutParams layoutParams_user = iv_clip_doll.getLayoutParams();
+                layoutParams_user.width = size_user;
+                layoutParams_user.height = size_user;
+                iv_clip_doll.setLayoutParams(layoutParams_user);
+
+                tv_clip_doll_name = (TextView) itemView.findViewById(R.id.tv_clip_doll_name);
+                tv_clip_doll_time = (TextView) itemView.findViewById(R.id.tv_clip_doll_time);
             }
         }
     }

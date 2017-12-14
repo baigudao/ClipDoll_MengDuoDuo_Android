@@ -8,18 +8,22 @@ package com.meng.duo.clip.doll.bean;
 public class ClipDollRecordBean extends BaseBean {
 
     /**
-     * createTime : 2017-11-24 14:20:47
-     * groupId : 348312
-     * lastUpdateTime : 2017-11-24 14:21:19
-     * playId : 10000189
-     * productId : 1
-     * recordTimeDesc : 7分钟前
-     * result : 1
-     * roomId : 1
-     * userId : 1000002
+     * createTime : 2017-12-14 19:43:10
+     * gameId : fdb04b8eea8b35210eb5e687b62a1f32
+     * groupId : 2019
+     * lastUpdateTime : 2017-12-14 19:43:48
+     * playId : 10000606
+     * productId : 20
+     * recordTimeDesc : 8分钟前
+     * result : 0
+     * roomId : 10000020
+     * toyName : 2019
+     * toyPicUrl : http://wawa-1255388722.cosgz.myqcloud.com/img/qeh1i3124123.jpg
+     * userId : 1000030
      */
 
     private String createTime;
+    private String gameId;
     private String groupId;
     private String lastUpdateTime;
     private int playId;
@@ -27,6 +31,8 @@ public class ClipDollRecordBean extends BaseBean {
     private String recordTimeDesc;
     private int result;
     private int roomId;
+    private String toyName;
+    private String toyPicUrl;
     private int userId;
 
     public String getCreateTime() {
@@ -35,6 +41,14 @@ public class ClipDollRecordBean extends BaseBean {
 
     public void setCreateTime(String createTime) {
         this.createTime = createTime;
+    }
+
+    public String getGameId() {
+        return gameId;
+    }
+
+    public void setGameId(String gameId) {
+        this.gameId = gameId;
     }
 
     public String getGroupId() {
@@ -91,6 +105,22 @@ public class ClipDollRecordBean extends BaseBean {
 
     public void setRoomId(int roomId) {
         this.roomId = roomId;
+    }
+
+    public String getToyName() {
+        return toyName;
+    }
+
+    public void setToyName(String toyName) {
+        this.toyName = toyName;
+    }
+
+    public String getToyPicUrl() {
+        return toyPicUrl;
+    }
+
+    public void setToyPicUrl(String toyPicUrl) {
+        this.toyPicUrl = toyPicUrl;
     }
 
     public int getUserId() {

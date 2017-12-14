@@ -5,7 +5,6 @@ import android.app.Application;
 import android.content.Context;
 import android.support.multidex.MultiDex;
 
-import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.Utils;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.MemoryCategory;
@@ -20,13 +19,11 @@ import com.scwang.smartrefresh.layout.api.RefreshLayout;
 import com.scwang.smartrefresh.layout.constant.SpinnerStyle;
 import com.scwang.smartrefresh.layout.footer.ClassicsFooter;
 import com.scwang.smartrefresh.layout.header.ClassicsHeader;
-import com.tencent.android.tpush.XGIOperateCallback;
-import com.tencent.android.tpush.XGPushConfig;
-import com.tencent.android.tpush.XGPushManager;
 import com.tencent.ilivesdk.ILiveSDK;
 import com.tencent.livesdk.ILVLiveConfig;
 import com.tencent.livesdk.ILVLiveManager;
 import com.umeng.analytics.MobclickAgent;
+import com.umeng.commonsdk.UMConfigure;
 import com.zhy.http.okhttp.OkHttpUtils;
 
 import java.util.concurrent.TimeUnit;
@@ -81,29 +78,9 @@ public class BaseApplication extends Application {
         ILVLiveConfig liveConfig = new ILVLiveConfig();
         ILVLiveManager.getInstance().init(liveConfig);
 
-        //信鸽推送
-        configXGPush();
-
         //友盟统计
-        MobclickAgent.setScenarioType(this, MobclickAgent.EScenarioType.E_UM_NORMAL );
-    }
-
-    private void configXGPush() {
-        XGPushConfig.enableDebug(this, true);
-        XGPushManager.registerPush(this, new XGIOperateCallback() {
-            @Override
-            public void onSuccess(Object data, int flag) {
-                //token在设备卸载重装的时候有可能会变
-                LogUtils.e("注册成功，设备token为：" + data);
-            }
-
-            @Override
-            public void onFail(Object data, int errCode, String msg) {
-                LogUtils.e("注册失败，错误码：" + errCode + ",错误信息：" + msg);
-            }
-        });
-        XGPushManager.registerPush(getApplicationContext(), "XINGE");
-        XGPushManager.setTag(this, "XINGE");
+        MobclickAgent.setScenarioType(this, MobclickAgent.EScenarioType.E_UM_NORMAL);
+        UMConfigure.init(this, UMConfigure.DEVICE_TYPE_PHONE, null);
     }
 
     private void configureOkHttp() {
