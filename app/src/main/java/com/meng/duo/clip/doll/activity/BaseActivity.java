@@ -15,6 +15,8 @@ import android.view.KeyEvent;
 import android.view.WindowManager;
 
 import com.blankj.utilcode.util.LogUtils;
+import com.blankj.utilcode.util.NetworkUtils;
+import com.blankj.utilcode.util.ToastUtils;
 import com.meng.duo.clip.doll.BaseApplication;
 import com.meng.duo.clip.doll.fragment.BaseFragment;
 import com.meng.duo.clip.doll.util.Constants;
@@ -200,6 +202,9 @@ public class BaseActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
+        if (!NetworkUtils.isConnected()) {
+            ToastUtils.showShort("当前无网络，请开启网络连接！");
+        }
     }
 
     @Override

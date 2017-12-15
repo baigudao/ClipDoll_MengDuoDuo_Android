@@ -28,7 +28,7 @@
             android:layout_marginLeft="10dp"
             android:layout_marginTop="10dp"
             android:layout_toRightOf="@id/iv_user_photo"
-            android:text="我爱抓娃娃"
+            android:text="萌多多抓娃娃"
             android:textColor="@color/main_text_color"
             android:textSize="18sp"/>
 
@@ -43,7 +43,7 @@
             android:layout_toRightOf="@id/iv_user_photo"
             android:ellipsize="end"
             android:maxLines="2"
-            android:text="你邀请的xxx加入了我爱抓娃娃，你获得邀请币60个。。。"
+            android:text="你邀请的xxx加入了萌多多抓娃娃，你获得邀请币60个。。。"
             android:textSize="13sp"/>
 
         <TextView

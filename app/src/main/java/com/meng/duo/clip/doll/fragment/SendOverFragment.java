@@ -16,6 +16,9 @@ import com.meng.duo.clip.doll.activity.MainActivity;
 import com.meng.duo.clip.doll.adapter.BaseRecyclerViewAdapter;
 import com.meng.duo.clip.doll.bean.WaitingSendBean;
 import com.meng.duo.clip.doll.util.Constants;
+import com.scwang.smartrefresh.layout.SmartRefreshLayout;
+import com.scwang.smartrefresh.layout.api.RefreshLayout;
+import com.scwang.smartrefresh.layout.listener.OnRefreshListener;
 import com.zhy.http.okhttp.OkHttpUtils;
 import com.zhy.http.okhttp.callback.StringCallback;
 
@@ -32,10 +35,13 @@ import okhttp3.Call;
  * E-mail:971060378@qq.com
  */
 
-public class SendOverFragment extends BaseFragment {
+public class SendOverFragment extends BaseFragment implements OnRefreshListener {
 
     private RecyclerView recyclerView;
     private LinearLayout ll_no_data;
+
+    private SmartRefreshLayout smartRefreshLayout;
+    private int mPage;
 
     private static final int SEND_OVER_DATA_TYPE = 8;
 
@@ -49,7 +55,12 @@ public class SendOverFragment extends BaseFragment {
         recyclerView = (RecyclerView) view.findViewById(R.id.recyclerView);
         ll_no_data = (LinearLayout) view.findViewById(R.id.ll_no_data);
 
+        smartRefreshLayout = (SmartRefreshLayout) view.findViewById(R.id.smartRefreshLayout);
+        smartRefreshLayout.setOnRefreshListener(this);
+        smartRefreshLayout.setEnableLoadmore(false);
         view.findViewById(R.id.btn_go_clip_doll).setOnClickListener(this);
+
+        mPage = 1;
     }
 
     @Override
@@ -69,7 +80,7 @@ public class SendOverFragment extends BaseFragment {
         OkHttpUtils.get()
                 .url(Constants.getSendOverUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.PAGENUM, "1")
+                .addParams(Constants.PAGENUM, String.valueOf(mPage))
                 .addParams(Constants.PAGESIZE, "10")
                 .build()
                 .execute(new StringCallback() {
@@ -89,6 +100,7 @@ public class SendOverFragment extends BaseFragment {
                             String req = jsonObjectResHead.optString("req");
                             JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
                             if (code == 1) {
+                                smartRefreshLayout.finishRefresh();
                                 handlerDataForSendOver(jsonObjectResBody);
                             } else {
                                 LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
@@ -120,5 +132,11 @@ public class SendOverFragment extends BaseFragment {
                 recyclerView.setVisibility(View.GONE);
             }
         }
+    }
+
+    @Override
+    public void onRefresh(RefreshLayout refreshlayout) {
+        mPage = 1;
+        getDataFromNet();
     }
 }

@@ -13,7 +13,6 @@ import android.widget.Toast;
 
 import com.blankj.utilcode.util.EmptyUtils;
 import com.blankj.utilcode.util.LogUtils;
-import com.blankj.utilcode.util.NetworkUtils;
 import com.blankj.utilcode.util.SPUtils;
 import com.blankj.utilcode.util.ScreenUtils;
 import com.blankj.utilcode.util.SizeUtils;
@@ -170,9 +169,6 @@ public class MainActivity extends BaseActivity implements View.OnClickListener, 
     @Override
     protected void onResume() {
         super.onResume();
-        if (!NetworkUtils.isConnected()) {
-            ToastUtils.showShort("当前无网络，请开启网络连接！");
-        }
         //是否首次登录
         int firstLogin = SPUtils.getInstance().getInt(Constants.FIRSTLOGIN);
         //0.是(跳注册奖励弹窗) 1.否

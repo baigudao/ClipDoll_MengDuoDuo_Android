@@ -5,6 +5,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.Gravity;
@@ -71,6 +73,7 @@ import java.util.TimerTask;
 
 import okhttp3.Call;
 
+import static com.meng.duo.clip.doll.R.drawable.wawa_loading;
 import static com.tencent.av.sdk.AVView.VIDEO_SRC_TYPE_CAMERA;
 import static com.tencent.ilivesdk.adapter.CommonConstants.Const_Auth_Host;
 import static com.tencent.ilivesdk.adapter.CommonConstants.Const_Auth_Member;
@@ -103,6 +106,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     private TextView tv_user_num;
     private TextView tv_live_room_player_name;
     private TextView tv_waiting_game_result;
+    private TextView tv_room_id;
     private ImageView iv_live_room_camera;
     private ImageView iv_background_music;
 
@@ -133,7 +137,22 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
 
     private HomeRoomBean homeRoomBean;
 
+    private int exceptionTime;
+    private Timer exceptionTimer;
+    private TimerTask exceptionTimerTask;
+
     private IWXAPI api;
+
+    private Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (msg.what == 55) {
+                beforeStartGame();
+            }
+        }
+    };
+    private TimerTask roomStateTimerTask;
 
 
     @Override
@@ -148,7 +167,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     }
 
     private void initView() {
-        showLoadingDialog("正在加载视频", null, true);
         //屏幕常亮
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         //一屏显示
@@ -175,6 +193,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         //主要视图
         arv_root = (AVRootView) findViewById(R.id.arv_root);
         ILVLiveManager.getInstance().setAvVideoView(arv_root);
+        arv_root.setBackground(R.drawable.wawa_loading);
         arv_root.setAutoOrientation(false);
         isFront = true;
         //有画面之后的回调
@@ -188,6 +207,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         ll_start_clip_doll.setOnClickListener(this);
         findViewById(R.id.ll_coin_recharge).setOnClickListener(this);
         tv_timer = (TextView) findViewById(R.id.tv_timer);
+        tv_room_id = (TextView) findViewById(R.id.tv_room_id);
         iv_live_room_camera = (ImageView) findViewById(R.id.iv_live_room_camera);
         iv_live_room_camera.setOnClickListener(this);
         iv_background_music = (ImageView) findViewById(R.id.iv_background_music);
@@ -248,6 +268,9 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     protected void onStart() {
         super.onStart();
         LogUtils.e("onStart");
+
+        //房间ID
+        tv_room_id.setText("房间ID:" + homeRoomBean.getRoomId());
 
         //得到余额
         getBalanceCoin();
@@ -496,6 +519,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
      * 开始游戏前
      */
     private void beforeStartGame() {
+        //隐藏等待游戏结果的提示文字
+        tv_waiting_game_result.setVisibility(View.GONE);
         //显示开始抓取和充值的入口
         rl_start_clip_and_recharge.setVisibility(View.VISIBLE);
         rl_operation.setVisibility(View.GONE);
@@ -507,7 +532,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         isShowGoBackDialog = false;
         //开始轮询房间状态
         roomStateTimer = new Timer();
-        roomStateTimer.schedule(new TimerTask() {
+        roomStateTimerTask = new TimerTask() {
             @Override
             public void run() {
                 OkHttpUtils.get()
@@ -563,7 +588,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                             }
                         });
             }
-        }, 0, 1500);
+        };
+        roomStateTimer.schedule(roomStateTimerTask, 0, 1500);
     }
 
     private void requestBeginGame() {
@@ -662,6 +688,24 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
      * 游戏后
      */
     private void startGameAfter() {
+        //开启异常轮询
+        //异常轮询器初始化
+        exceptionTime = 25;
+        exceptionTimer = new Timer();
+        exceptionTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                --exceptionTime;
+                if (exceptionTime == 0) {
+                    Message message = new Message();
+                    message.what = 55;
+                    handler.sendMessage(message);
+                    exceptionTimer.cancel();
+                    exceptionTimerTask.cancel();
+                }
+            }
+        };
+        exceptionTimer.schedule(exceptionTimerTask, 0, 1000);
         //显示等待结果的文字
         tv_waiting_game_result.setVisibility(View.VISIBLE);
         //下抓的音效
@@ -720,25 +764,29 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                         int result = jsonObjectResData.optInt("result");
                                                         switch (result) {
                                                             case -1:
-                                                                //未抓取
+
                                                                 break;
                                                             case 0:
                                                                 //没抓中
                                                                 gameResultTimer.cancel();
+                                                                gameResultTimer = null;
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(5);
                                                                 }
                                                                 showResultDialog(false);
+                                                                beforeStartGame();
                                                                 //隐藏等待结果的文字
                                                                 tv_waiting_game_result.setVisibility(View.GONE);
                                                                 break;
                                                             case 1:
                                                                 //抓中
                                                                 gameResultTimer.cancel();
+                                                                gameResultTimer = null;
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(4);
                                                                 }
                                                                 showResultDialog(true);
+                                                                beforeStartGame();
                                                                 //隐藏等待结果的文字
                                                                 tv_waiting_game_result.setVisibility(View.GONE);
                                                                 break;
@@ -765,31 +813,36 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     }
 
     private void showResultDialog(boolean isClip) {
+        beforeStartGame();
         if (isClip) {
             clipYesPopupWindow = new ClipYesPopupWindow(this, new ClipYesPopupWindow.ClipYesPopupNumListener() {
                 @Override
                 public void onCancelClicked() {
                     tryAgingYesTimer.cancel();
                     gameOver();
-                    beforeStartGame();
+                    //                    beforeStartGame();
                 }
 
                 @Override
                 public void onGoToInviteClicked() {
                     tryAgingYesTimer.cancel();
                     gameOver();
-                    beforeStartGame();
+                    //                    beforeStartGame();
                     gotoPager(InvitePrizeFragment.class, null);
                 }
 
                 @Override
                 public void onTryAgingClicked() {
                     tryAgingYesTimer.cancel();
+                    exceptionTimer.cancel();
+                    exceptionTimerTask.cancel();
+                    beforeStartGame();
                     requestBeginGame();
                 }
             });
             clipYesPopupWindow.initView();
             clipYesPopupWindow.showAtLocation(view, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0);
+            clipYesPopupWindow.setOutsideTouchable(false);
 
             final Button btn_try_aging = (Button) clipYesPopupWindow.getContentView().findViewById(R.id.btn_try_aging);
             tryAgingYesTimer = new Timer();
@@ -801,11 +854,15 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                         public void run() {
                             --tryAgingTotalTime;
                             btn_try_aging.setText("再来一局（" + tryAgingTotalTime + "）");
-                            if (tryAgingTotalTime <= 0) {
+                            if (tryAgingTotalTime == 0) {
                                 clipYesPopupWindow.dismiss();
                                 tryAgingYesTimer.cancel();
-                                beforeStartGame();
+                                //                                beforeStartGame();
                                 gameOver();
+                            }
+                            if (tryAgingTotalTime < 0) {
+                                tryAgingYesTimer = null;
+                                return;
                             }
                         }
                     });
@@ -817,25 +874,29 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                 public void onCancelClicked() {
                     tryAgingNoTimer.cancel();
                     gameOver();
-                    beforeStartGame();
+                    //                    beforeStartGame();
                 }
 
                 @Override
                 public void onGoToInviteClicked() {
                     tryAgingNoTimer.cancel();
                     gameOver();
-                    beforeStartGame();
+                    //                    beforeStartGame();
                     gotoPager(InvitePrizeFragment.class, null);
                 }
 
                 @Override
                 public void onTryAgingClicked() {
                     tryAgingNoTimer.cancel();
+                    exceptionTimer.cancel();
+                    exceptionTimerTask.cancel();
+                    beforeStartGame();
                     requestBeginGame();
                 }
             });
             clipNoPopupWindow.initView();
             clipNoPopupWindow.showAtLocation(view, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0);
+            clipNoPopupWindow.setOutsideTouchable(false);
 
             final Button btn_try_aging = (Button) clipNoPopupWindow.getContentView().findViewById(R.id.btn_try_aging);
             tryAgingNoTimer = new Timer();
@@ -847,11 +908,15 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                         public void run() {
                             --tryAgingTotalTime;
                             btn_try_aging.setText("再来一局（" + tryAgingTotalTime + "）");
-                            if (tryAgingTotalTime <= 0) {
+                            if (tryAgingTotalTime == 0) {
                                 clipNoPopupWindow.dismiss();
                                 tryAgingNoTimer.cancel();
-                                beforeStartGame();
+                                //                                beforeStartGame();
                                 gameOver();
+                            }
+                            if (tryAgingTotalTime < 0) {
+                                tryAgingNoTimer = null;
+                                return;
                             }
                         }
                     });
@@ -863,10 +928,12 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     @Override
     public void onSubViewCreated() {
         if (arv_root.getViewByIndex(0) != null) { //主摄像头画面
+            arv_root.getViewByIndex(0).setBackground(wawa_loading);
             arv_root.getViewByIndex(0).setRotate(false);
             arv_root.getViewByIndex(0).setRotation(90);
         }
         if (arv_root.getViewByIndex(1) != null) { //副摄像头画面
+            arv_root.getViewByIndex(1).setBackground(wawa_loading);
             arv_root.getViewByIndex(1).setPosHeight(0);
             arv_root.getViewByIndex(1).setPosWidth(0);
             arv_root.getViewByIndex(1).setRotate(false);
@@ -879,7 +946,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             @Override
             public void onFirstFrameRecved(int width, int height, int angle, String identifier) {
                 LogUtils.e("主摄像头：onFirstFrameRecved。" + " 详情： " + "width=" + width + ",height=" + height + ",angle=" + angle + ",identifier=" + identifier);
-                hideLoadingDialog();
             }
 
             @Override
@@ -907,7 +973,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             @Override
             public void onFirstFrameRecved(int width, int height, int angle, String identifier) {
                 LogUtils.e("副摄像头：onFirstFrameRecved。" + " 详情： " + "width=" + width + ",height=" + height + ",angle=" + angle + ",identifier=" + identifier);
-                hideLoadingDialog();
             }
 
             @Override
@@ -980,7 +1045,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                     if (EmptyUtils.isNotEmpty(jsonObjectUser)) {
                                                         ll_live_room_player.setVisibility(View.VISIBLE);
                                                         String headImg = jsonObjectUser.optString("headImg");
-                                                        LogUtils.e("玩家的图像地址：" + headImg);
                                                         Glide.with(ClipDollDetailActivity.this)
                                                                 .load(headImg)
                                                                 .placeholder(R.drawable.wawa_default_user)
@@ -1112,6 +1176,9 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         LogUtils.e("onStop");
         if (EmptyUtils.isNotEmpty(roomStateTimer)) {
             roomStateTimer.cancel();
+            roomStateTimer = null;//取消房间的状态轮询
+            roomStateTimerTask.cancel();
+            roomStateTimerTask = null;
         }
         if (EmptyUtils.isNotEmpty(playerNumTimer)) {
             playerNumTimer.cancel();
@@ -1167,7 +1234,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         ILVLiveManager.getInstance().onDestory();
         releaseResource();
         Glide.with(getApplicationContext()).pauseRequests();
-        roomStateTimer = null;//取消房间的状态轮询
+        BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).stopMusic();
         super.onDestroy();
     }
 
@@ -1218,6 +1285,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
 
     private void gameOver() {
         isShowGoBackDialog = false;
+        exceptionTimer.cancel();
+        exceptionTimerTask.cancel();
         ILiveRoomManager.getInstance().changeAuthority(Const_Auth_Member, new ILiveCallBack() {
             @Override
             public void onSuccess(Object data) {
