@@ -32,21 +32,27 @@ public class Constants {
     public static final String PAGESIZE = "pageSize";
     public static final String RESULT = "result";
     public static final String CONTENT = "content";
+    public static final String GAMEID = "gameId";
+    public static final String OPER = "oper";
+    public static final String LEFT = "left";
+    public static final String RIGHT = "right";
+    public static final String DOWN = "down";
+    public static final String UP = "up";
+    public static final String CATCH = "catch";
     public static final String TYPE = "type";
     public static final String FIRSTLOGIN = "firstLogin";
     public static final String FROMINVITECODE = "fromInviteCode";
     public static final String IS_PLAY_BACKGROUND_SOUND = "is_play_background_sound";
     public static final String IS_PLAY_BACKGROUND_MUSIC = "is_play_background_music";
     public static final int PAGE_SIZE = 10;
-
-    // 直播角色
     public static final String ROLE_MASTER = "LiveMaster";
     public static final String ROLE_GUEST = "Guest";
     public static final String ROLE_LIVEGUEST = "LiveGuest";
+    public static final String JOIN_ROOM_FAIL = "加入房间失败";
 
 
     //网络常量
-    private static final String BASE_URL = "https://wwapi.91tmedia.com/wawa_api/";//http://119.29.238.35:8081   https://wwapi.91tmedia.com
+    private static final String BASE_URL = "https://wwapi.91tmedia.com/wawa_api/";
     private static final String homeRoomListUrl = BASE_URL + "live/room/getHomeRoomList/v1";
     private static final String homeBannerUrl = BASE_URL + "home/getBannerList/v1";
     private static final String clipDollRecordUrl = BASE_URL + "playRecord/getPlayRecordList/v1";

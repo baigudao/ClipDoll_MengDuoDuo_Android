@@ -5,8 +5,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.Gravity;
@@ -43,8 +41,7 @@ import com.meng.duo.clip.doll.util.Constants;
 import com.meng.duo.clip.doll.util.DataManager;
 import com.meng.duo.clip.doll.util.SoundPoolUtil;
 import com.meng.duo.clip.doll.view.CircleImageView;
-import com.meng.duo.clip.doll.view.ClipNoPopupWindow;
-import com.meng.duo.clip.doll.view.ClipYesPopupWindow;
+import com.meng.duo.clip.doll.view.ClipDollResultPopupWindow;
 import com.meng.duo.clip.doll.view.SharePlatformPopupWindow;
 import com.tencent.av.sdk.AVRoomMulti;
 import com.tencent.ilivesdk.ILiveCallBack;
@@ -120,39 +117,32 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
 
     private TextView tv_timer;
 
+    //关于定时器
+    private Timer roomStateTimer;
+    private TimerTask roomStateTimerTask;
+    private Timer playerNumTimer;
+    private TimerTask playerNumTimerTask;
+    private int mTotalTime;
     private Timer mTimer;
     private TimerTask mTask;
-    private int mTotalTime;
-    private int tryAgingTotalTime;
-    private Timer tryAgingYesTimer;
-    private Timer tryAgingNoTimer;
-    private Timer roomStateTimer;
-    private Timer playerNumTimer;
     private Timer gameResultTimer;
-    private ClipNoPopupWindow clipNoPopupWindow;
-    private ClipYesPopupWindow clipYesPopupWindow;
+    private TimerTask gameResultTimerTask;
+    private int exceptionTime;
+    private Timer exceptionTimer;
+    private TimerTask exceptionTimerTask;
+    private int tryAgingTime;
+    private Timer tryAgingTimer;
+    private TimerTask tryAgingTimerTask;
+
+    private ClipDollResultPopupWindow clipDollResultPopupWindow;
 
     private boolean isShowGoBackDialog;
     private boolean isCloseBackgroundMusicAndSound;
 
     private HomeRoomBean homeRoomBean;
 
-    private int exceptionTime;
-    private Timer exceptionTimer;
-    private TimerTask exceptionTimerTask;
-
+    private String gameId;
     private IWXAPI api;
-
-    private Handler handler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            if (msg.what == 55) {
-                beforeStartGame();
-            }
-        }
-    };
-    private TimerTask roomStateTimerTask;
 
 
     @Override
@@ -163,7 +153,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         setContentView(view);
 
         initView();
-        LogUtils.e("onCreate");
+        initData();
     }
 
     private void initView() {
@@ -180,7 +170,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         RelativeLayout.LayoutParams layoutParams_live = (RelativeLayout.LayoutParams) rl_live_view.getLayoutParams();
         layoutParams_live.height = (height * 7) / 10;
         rl_live_view.setLayoutParams(layoutParams_live);
-        //开始和充值按钮距离上面
+        //开始和充值按钮距离上面\
         rl_start_clip_and_recharge = (RelativeLayout) findViewById(R.id.rl_start_clip_and_recharge);
         RelativeLayout.LayoutParams layoutParams_start_clip = (RelativeLayout.LayoutParams) rl_start_clip_and_recharge.getLayoutParams();
         layoutParams_start_clip.topMargin = (height * 3 / 10 - SizeUtils.dp2px(100)) / 2;
@@ -245,10 +235,27 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         //底部视图的初始化
         recyclerView_lucky = (RecyclerView) findViewById(R.id.recyclerView_lucky);
         recyclerView_introduce = (RecyclerView) findViewById(R.id.recyclerView_introduce);
+    }
 
+    private void initData() {
         //得到主页面传过来的数据
         homeRoomBean = (HomeRoomBean) DataManager.getInstance().getData1();
         DataManager.getInstance().setData1(null);
+
+        //房间ID
+        tv_room_id.setText("房间ID:" + homeRoomBean.getRoomId());
+        //渲染宝贝图片
+        if (EmptyUtils.isNotEmpty(homeRoomBean)) {
+            ArrayList<String> stringArrayList = (ArrayList<String>) homeRoomBean.getProduct().getDetailPics();
+            if (stringArrayList.size() != 0) {
+                BaseRecyclerViewAdapter baseRecyclerViewAdapter = new BaseRecyclerViewAdapter(ClipDollDetailActivity.this, stringArrayList, PRODUCT_INTRODUCE_DATA_TYPE);
+                recyclerView_introduce.setAdapter(baseRecyclerViewAdapter);
+                recyclerView_introduce.setLayoutManager(new LinearLayoutManager(ClipDollDetailActivity.this, LinearLayoutManager.VERTICAL, false));
+            }
+        }
+
+        //控制媒体音量
+        this.setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
         //注册微信
         regToWx();
@@ -259,79 +266,322 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         //默认显示
         beforeStartGame();
 
-        //控制媒体音量
-        this.setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        //开始轮询房间状态
+        getRoomState();
+
+        //开启轮询，获取直播间观众数和玩家
+        getLiveRoomPlayerNum();
     }
 
+    /**
+     * 加入房间
+     */
+    private void joinRoom() {
+        //加入房间配置项
+        ILVLiveRoomOption memberOption = new ILVLiveRoomOption("")
+                .autoCamera(false) //是否自动打开摄像头
+                .controlRole(Constants.ROLE_GUEST) //角色设置 LiveGuest
+                .authBits(AVRoomMulti.AUTH_BITS_JOIN_ROOM | AVRoomMulti.AUTH_BITS_RECV_AUDIO |
+                        AVRoomMulti.AUTH_BITS_RECV_CAMERA_VIDEO | AVRoomMulti.AUTH_BITS_RECV_SCREEN_VIDEO) //权限设置
+                .videoRecvMode(AVRoomMulti.VIDEO_RECV_MODE_SEMI_AUTO_RECV_CAMERA_VIDEO) //是否开始半自动接收
+                .autoMic(false);//是否自动打开mic
 
+        //加入房间
+        ILVLiveManager.getInstance().joinRoom(Integer.parseInt(homeRoomBean.getGroupId()), memberOption, new ILiveCallBack() {//10054
+            @Override
+            public void onSuccess(Object data) {
+                //加入房间成功
+                ILiveRoomManager.getInstance().enableSpeaker(false);
+                ILiveRoomManager.getInstance().enableMic(false);
+            }
+
+            @Override
+            public void onError(String module, int errCode, String errMsg) {
+                //加入房间失败
+                LogUtils.e("加入房间失败：" + "module=" + module + ",errMsg=" + errMsg + ",errCode=" + errCode);
+                if (errCode != 1003) {
+                    //加入房间失败，弹出对话框
+                    showDialogs(0, false);
+                }
+            }
+        });
+    }
+
+    /**
+     * 开始游戏前
+     */
+    private void beforeStartGame() {
+        //显示开始抓取和充值的入口
+        rl_start_clip_and_recharge.setVisibility(View.VISIBLE);
+        rl_operation.setVisibility(View.GONE);
+        ll_start_clip_doll.setEnabled(true);
+        tv_start_clip_doll.setTextColor(getResources().getColor(R.color.seventh_text_color));
+        tv_cost_coin_num.setTextColor(getResources().getColor(R.color.seventh_text_color));
+        tv_cost_coin_num.setText(String.valueOf(homeRoomBean.getGamePrice()) + "币/次");
+        //隐藏等待游戏结果的提示文字
+        tv_waiting_game_result.setVisibility(View.GONE);
+        //是否弹出正在游戏时退出房间的对话框
+        isShowGoBackDialog = false;
+    }
+
+    /**
+     * 开始轮询房间状态
+     */
+    private void getRoomState() {
+        roomStateTimer = new Timer();
+        roomStateTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        OkHttpUtils.get()
+                                .url(Constants.getRoomStateUrl())
+                                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                                .addParams(Constants.ROOMID, String.valueOf(homeRoomBean.getRoomId()))
+                                .build()
+                                .execute(new StringCallback() {
+                                    @Override
+                                    public void onError(Call call, Exception e, int id) {
+                                        LogUtils.e(e.toString());
+                                    }
+
+                                    @Override
+                                    public void onResponse(String response, int id) {
+                                        LogUtils.e(response);
+                                        JSONObject jsonObject = null;
+                                        try {
+                                            jsonObject = new JSONObject(response);
+                                            JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
+                                            int code = jsonObjectResHead.optInt("code");
+                                            String msg = jsonObjectResHead.optString("msg");
+                                            String req = jsonObjectResHead.optString("req");
+                                            JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
+                                            if (code == 1) {
+                                                int success = jsonObjectResBody.optInt("success");
+                                                if (success == 1) {
+                                                    int roomState = jsonObjectResBody.optInt("roomState");
+                                                    switch (roomState) {
+                                                        case 0:
+                                                            //空闲中：显示开始按钮并激活
+                                                            ll_start_clip_doll.setEnabled(true);
+                                                            tv_start_clip_doll.setTextColor(getResources().getColor(R.color.seventh_text_color));
+                                                            tv_cost_coin_num.setTextColor(getResources().getColor(R.color.seventh_text_color));
+                                                            break;
+                                                        case 1:
+                                                            //游戏中
+                                                            ll_start_clip_doll.setEnabled(false);
+                                                            tv_start_clip_doll.setTextColor(getResources().getColor(R.color.pure_white_color));
+                                                            tv_cost_coin_num.setTextColor(getResources().getColor(R.color.pure_white_color));
+                                                            break;
+                                                        default:
+                                                            break;
+                                                    }
+                                                }
+                                            } else {
+                                                LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
+                                                ToastUtils.showShort("请求数据失败:" + msg);
+                                            }
+                                        } catch (JSONException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                });
+                    }
+                });
+            }
+        };
+        roomStateTimer.schedule(roomStateTimerTask, 0, 1500);
+    }
+
+    /**
+     * 每3秒获取直播间观众数和玩家
+     */
+    private void getLiveRoomPlayerNum() {
+        playerNumTimer = new Timer();
+        playerNumTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        OkHttpUtils.get()
+                                .url(Constants.getLiveRoomUserUrl())
+                                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
+                                .build()
+                                .execute(new StringCallback() {
+                                    @Override
+                                    public void onError(Call call, Exception e, int id) {
+                                        LogUtils.e(e.toString());
+                                    }
+
+                                    @Override
+                                    public void onResponse(final String response, int id) {
+                                        if (!ClipDollDetailActivity.this.isFinishing()) {
+                                            JSONObject jsonObject = null;
+                                            try {
+                                                jsonObject = new JSONObject(response);
+                                                JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
+                                                int code = jsonObjectResHead.optInt("code");
+                                                String msg = jsonObjectResHead.optString("msg");
+                                                String req = jsonObjectResHead.optString("req");
+                                                JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
+                                                if (code == 1) {
+                                                    int success = jsonObjectResBody.optInt("success");
+                                                    if (success == 1) {
+                                                        JSONObject jsonObjectReq = jsonObjectResBody.optJSONObject("req");
+                                                        if (EmptyUtils.isNotEmpty(jsonObjectReq)) {
+                                                            JSONObject jsonObjectUser = jsonObjectReq.optJSONObject("user");
+                                                            if (EmptyUtils.isNotEmpty(jsonObjectUser)) {
+                                                                ll_live_room_player.setVisibility(View.VISIBLE);
+                                                                String headImg = jsonObjectUser.optString("headImg");
+                                                                Glide.with(ClipDollDetailActivity.this)
+                                                                        .load(headImg)
+                                                                        .placeholder(R.drawable.wawa_default_user)
+                                                                        .error(R.drawable.wawa_default_user)
+                                                                        .into(iv_live_room_player);
+                                                                String nickName = jsonObjectUser.optString("nickName");
+                                                                tv_live_room_player_name.setText(nickName);
+                                                            } else {
+                                                                ll_live_room_player.setVisibility(View.GONE);
+                                                            }
+                                                            JSONArray jsonArrayUserList = jsonObjectReq.optJSONArray("userList");
+                                                            if (EmptyUtils.isNotEmpty(jsonArrayUserList)) {
+                                                                Gson gson = new Gson();
+                                                                ArrayList<LiveRoomUserBean> liveRoomUserBeanArrayList = gson.fromJson(jsonArrayUserList.toString(), new TypeToken<ArrayList<LiveRoomUserBean>>() {
+                                                                }.getType());
+                                                                if (liveRoomUserBeanArrayList.size() != 0) {
+                                                                    rl_live_room_user.setVisibility(View.VISIBLE);
+                                                                    int userNum = jsonObjectReq.optInt("userNum");
+                                                                    tv_user_num.setText(userNum + "人在线");
+                                                                    int user_size = liveRoomUserBeanArrayList.size();
+                                                                    switch (user_size) {
+                                                                        case 1:
+                                                                            iv_user_1.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_1);
+                                                                            iv_user_2.setVisibility(View.GONE);
+                                                                            iv_user_3.setVisibility(View.GONE);
+                                                                            iv_user_4.setVisibility(View.GONE);
+                                                                            break;
+                                                                        case 2:
+                                                                            iv_user_1.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_1);
+                                                                            iv_user_2.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_2);
+                                                                            iv_user_3.setVisibility(View.GONE);
+                                                                            iv_user_4.setVisibility(View.GONE);
+                                                                            break;
+                                                                        case 3:
+                                                                            iv_user_1.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_1);
+                                                                            iv_user_2.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_2);
+                                                                            iv_user_3.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(2).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_3);
+                                                                            iv_user_4.setVisibility(View.GONE);
+                                                                            break;
+                                                                        case 4:
+                                                                            iv_user_1.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_1);
+                                                                            iv_user_2.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_2);
+                                                                            iv_user_3.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(2).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_3);
+                                                                            iv_user_4.setVisibility(View.VISIBLE);
+                                                                            Glide.with(ClipDollDetailActivity.this)
+                                                                                    .load(liveRoomUserBeanArrayList.get(3).getHeadImg())
+                                                                                    .placeholder(R.drawable.avatar)
+                                                                                    .error(R.drawable.avatar)
+                                                                                    .into(iv_user_4);
+                                                                            break;
+                                                                        default:
+                                                                            break;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
+                                                    ToastUtils.showShort("请求数据失败:" + msg);
+                                                }
+                                            } catch (JSONException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    }
+                                });
+                    }
+                });
+            }
+        };
+        playerNumTimer.schedule(playerNumTimerTask, 0, 3000);
+    }
+
+    /**
+     * 可见，不可操作
+     */
     @Override
     protected void onStart() {
         super.onStart();
         LogUtils.e("onStart");
+    }
 
-        //房间ID
-        tv_room_id.setText("房间ID:" + homeRoomBean.getRoomId());
-
+    /**
+     * 可见，可操作
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        LogUtils.e("onResume");
+        ILVLiveManager.getInstance().onResume();
         //得到余额
         getBalanceCoin();
         //得到幸运儿
         getLuckyUsers();
-
-        //渲染宝贝图片
-        if (EmptyUtils.isNotEmpty(homeRoomBean)) {
-            ArrayList<String> stringArrayList = (ArrayList<String>) homeRoomBean.getProduct().getDetailPics();
-            if (stringArrayList.size() != 0) {
-                BaseRecyclerViewAdapter baseRecyclerViewAdapter = new BaseRecyclerViewAdapter(ClipDollDetailActivity.this, stringArrayList, PRODUCT_INTRODUCE_DATA_TYPE);
-                recyclerView_introduce.setAdapter(baseRecyclerViewAdapter);
-                recyclerView_introduce.setLayoutManager(new LinearLayoutManager(ClipDollDetailActivity.this, LinearLayoutManager.VERTICAL, false));
-            }
+        //用户加入直播间 计数
+        addUserNumForLiveRoom();
+        //如果背景音乐打开，就播放背景音乐
+        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_MUSIC)) {
+            BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).playMusic();
         }
-    }
-
-    private void addUserNumForLiveRoom() {
-        OkHttpUtils.get()
-                .url(Constants.getAddUserForLiveRoomUrl())
-                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .build()
-                .execute(new StringCallback() {
-                    @Override
-                    public void onError(Call call, Exception e, int id) {
-                        LogUtils.e(e.toString());
-                    }
-
-                    @Override
-                    public void onResponse(String response, int id) {
-                        JSONObject jsonObject = null;
-                        try {
-                            jsonObject = new JSONObject(response);
-                            JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
-                            int code = jsonObjectResHead.optInt("code");
-                            String msg = jsonObjectResHead.optString("msg");
-                            String req = jsonObjectResHead.optString("req");
-                            JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
-                            if (code == 1) {
-                                playerNumTimer = new Timer();
-                                playerNumTimer.schedule(new TimerTask() {
-                                    @Override
-                                    public void run() {
-                                        //获取直播间观众数和玩家 计数
-                                        getLiveRoomPlayerNum();
-                                    }
-                                }, 0, 3000);
-                                int success = jsonObjectResBody.optInt("success");
-                                if (success != 1) {
-                                    ToastUtils.showShort("您的图像显示失败");
-                                }
-                            } else {
-                                LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
-                                ToastUtils.showShort("请求数据失败:" + msg);
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
     }
 
     private void getBalanceCoin() {
@@ -407,6 +657,11 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                 });
     }
 
+    /**
+     * 处理幸运儿的数据
+     *
+     * @param jsonObjectResBody
+     */
     private void handlerDataForLuckyUsers(JSONObject jsonObjectResBody) {
         if (EmptyUtils.isNotEmpty(jsonObjectResBody)) {
             JSONArray jsonArrayForLuckyUsers = jsonObjectResBody.optJSONArray("pageData");
@@ -425,37 +680,152 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         }
     }
 
-    private void joinRoom() {
-        //加入房间配置项
-        ILVLiveRoomOption memberOption = new ILVLiveRoomOption("")
-                .autoCamera(false) //是否自动打开摄像头
-                .controlRole("Guest") //角色设置 LiveGuest
-                .authBits(AVRoomMulti.AUTH_BITS_JOIN_ROOM | AVRoomMulti.AUTH_BITS_RECV_AUDIO |
-                        AVRoomMulti.AUTH_BITS_RECV_CAMERA_VIDEO | AVRoomMulti.AUTH_BITS_RECV_SCREEN_VIDEO) //权限设置
-                .videoRecvMode(AVRoomMulti.VIDEO_RECV_MODE_SEMI_AUTO_RECV_CAMERA_VIDEO) //是否开始半自动接收
-                .autoMic(false);//是否自动打开mic
+    /**
+     * 用户加入直播间 计数
+     */
+    private void addUserNumForLiveRoom() {
+        OkHttpUtils.get()
+                .url(Constants.getAddUserForLiveRoomUrl())
+                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
+                .build()
+                .execute(new StringCallback() {
+                    @Override
+                    public void onError(Call call, Exception e, int id) {
+                        LogUtils.e(e.toString());
+                    }
 
-        //加入房间
-        ILVLiveManager.getInstance().joinRoom(Integer.parseInt(homeRoomBean.getGroupId()), memberOption, new ILiveCallBack() {//10054
-            @Override
-            public void onSuccess(Object data) {
-                //加入房间成功
-                ILiveRoomManager.getInstance().enableSpeaker(false);
-                ILiveRoomManager.getInstance().enableMic(false);
+                    @Override
+                    public void onResponse(String response, int id) {
+                        JSONObject jsonObject = null;
+                        try {
+                            jsonObject = new JSONObject(response);
+                            JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
+                            int code = jsonObjectResHead.optInt("code");
+                            String msg = jsonObjectResHead.optString("msg");
+                            String req = jsonObjectResHead.optString("req");
+                            JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
+                            if (code == 1) {
+                                int success = jsonObjectResBody.optInt("success");
+                                if (success == 1) {
+                                    LogUtils.e("加入房间，计数成功");
+                                }
+                            } else {
+                                LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
+                                ToastUtils.showShort("请求数据失败:" + msg);
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        LogUtils.e("onPause");
+        ILVLiveManager.getInstance().onPause();
+    }
+
+    /**
+     * 不可见，不可操作
+     */
+    @Override
+    protected void onStop() {
+        LogUtils.e("onStop");
+        super.onStop();
+        //用户退出直播间 计数
+        removeUserNumForLiveRoom();
+        //停止播放背景音乐
+        BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).stopMusic();
+    }
+
+    /**
+     * 用户退出直播间 计数
+     */
+    private void removeUserNumForLiveRoom() {
+        OkHttpUtils.get()
+                .url(Constants.getRemoveUserForLiveRoomUrl())
+                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
+                .build()
+                .execute(new StringCallback() {
+                    @Override
+                    public void onError(Call call, Exception e, int id) {
+                        LogUtils.e(e.toString());
+                    }
+
+                    @Override
+                    public void onResponse(String response, int id) {
+                        JSONObject jsonObject = null;
+                        try {
+                            jsonObject = new JSONObject(response);
+                            JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
+                            int code = jsonObjectResHead.optInt("code");
+                            String msg = jsonObjectResHead.optString("msg");
+                            String req = jsonObjectResHead.optString("req");
+                            JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
+                            if (code == 1) {
+                                int success = jsonObjectResBody.optInt("success");
+                                if (success == 1) {
+                                    LogUtils.e("退出房间，计数成功");
+                                }
+                            } else {
+                                LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
+                                ToastUtils.showShort("请求数据失败:" + msg);
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+    }
+
+    @Override
+    protected void onDestroy() {
+        LogUtils.e("onDestroy");
+        ILVLiveManager.getInstance().onDestory();
+        //取消房间的状态轮询
+        if (EmptyUtils.isNotEmpty(roomStateTimer)) {
+            roomStateTimer.cancel();
+            roomStateTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(roomStateTimerTask)) {
+            roomStateTimerTask.cancel();
+            roomStateTimerTask = null;
+        }
+        if (EmptyUtils.isNotEmpty(playerNumTimer)) {
+            playerNumTimer.cancel();
+            playerNumTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(playerNumTimerTask)) {
+            playerNumTimerTask.cancel();
+            playerNumTimerTask = null;
+        }
+        //停止播放背景音乐
+        BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).stopMusic();
+        super.onDestroy();
+    }
+
+    //======================================开始操作=================================================
+
+    /**
+     * 回退键的监听
+     *
+     * @param keyCode
+     * @param event
+     * @return
+     */
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (isShowGoBackDialog) {
+                showDialogs(1, false);
             }
-
-            @Override
-            public void onError(String module, int errCode, String errMsg) {
-                //加入房间失败
-                LogUtils.e("加入房间失败：" + "module=" + module + ",errMsg=" + errMsg + ",errCode=" + errCode);
-                if (errCode == 1003) {
-
-                } else {
-                    //加入房间失败，弹出对话框
-                    showJoinRoomFailDialog();
-                }
-            }
-        });
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
@@ -463,7 +833,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         switch (v.getId()) {
             case R.id.ll_close:
                 if (isShowGoBackDialog) {
-                    showGoBackDialog();
+                    showDialogs(1, false);
                 } else {
                     goBack();
                 }
@@ -479,7 +849,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                 }
                 break;
             case R.id.ll_start_clip_doll:
-                //请求开始游戏接口
+                //请求开始游戏
                 requestBeginGame();
                 break;
             case R.id.ll_coin_recharge:
@@ -513,87 +883,11 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         }
     }
 
-    //==============================================固定============================================
-
     /**
-     * 开始游戏前
+     * 申请开始游戏
      */
-    private void beforeStartGame() {
-        //隐藏等待游戏结果的提示文字
-        tv_waiting_game_result.setVisibility(View.GONE);
-        //显示开始抓取和充值的入口
-        rl_start_clip_and_recharge.setVisibility(View.VISIBLE);
-        rl_operation.setVisibility(View.GONE);
-        ll_start_clip_doll.setEnabled(true);
-        tv_start_clip_doll.setTextColor(getResources().getColor(R.color.seventh_text_color));
-        tv_cost_coin_num.setTextColor(getResources().getColor(R.color.seventh_text_color));
-        tv_cost_coin_num.setText(String.valueOf(homeRoomBean.getGamePrice()) + "币/次");
-        //是否弹出退出房间的对话框
-        isShowGoBackDialog = false;
-        //开始轮询房间状态
-        roomStateTimer = new Timer();
-        roomStateTimerTask = new TimerTask() {
-            @Override
-            public void run() {
-                OkHttpUtils.get()
-                        .url(Constants.getRoomStateUrl())
-                        .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                        .addParams(Constants.ROOMID, String.valueOf(homeRoomBean.getRoomId()))
-                        .build()
-                        .execute(new StringCallback() {
-                            @Override
-                            public void onError(Call call, Exception e, int id) {
-                                LogUtils.e(e.toString());
-                            }
-
-                            @Override
-                            public void onResponse(String response, int id) {
-                                LogUtils.e(response);
-                                JSONObject jsonObject = null;
-                                try {
-                                    jsonObject = new JSONObject(response);
-                                    JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
-                                    int code = jsonObjectResHead.optInt("code");
-                                    String msg = jsonObjectResHead.optString("msg");
-                                    String req = jsonObjectResHead.optString("req");
-                                    JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
-                                    if (code == 1) {
-                                        int success = jsonObjectResBody.optInt("success");
-                                        if (success == 1) {
-                                            int roomState = jsonObjectResBody.optInt("roomState");
-                                            switch (roomState) {
-                                                case 0:
-                                                    //空闲中：显示开始按钮并激活
-                                                    ll_start_clip_doll.setEnabled(true);
-                                                    tv_start_clip_doll.setTextColor(getResources().getColor(R.color.seventh_text_color));
-                                                    tv_cost_coin_num.setTextColor(getResources().getColor(R.color.seventh_text_color));
-                                                    break;
-                                                case 1:
-                                                    //游戏中
-                                                    ll_start_clip_doll.setEnabled(false);
-                                                    tv_start_clip_doll.setTextColor(getResources().getColor(R.color.pure_white_color));
-                                                    tv_cost_coin_num.setTextColor(getResources().getColor(R.color.pure_white_color));
-                                                    break;
-                                                default:
-                                                    break;
-                                            }
-                                        }
-                                    } else {
-                                        LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
-                                        ToastUtils.showShort("请求数据失败:" + msg);
-                                    }
-                                } catch (JSONException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        });
-            }
-        };
-        roomStateTimer.schedule(roomStateTimerTask, 0, 1500);
-    }
-
     private void requestBeginGame() {
-        tryAgingTotalTime = 10;
+        //释放以前
         OkHttpUtils.post()
                 .url(Constants.getApplyBeginGameUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
@@ -618,31 +912,15 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                             if (code == 1) {
                                 int success = jsonObjectResBody.optInt("success");
                                 switch (success) {
-                                    case 0:
+                                    case 0://申请开始游戏失败
                                         String alertMsg = jsonObjectResBody.optString("alertMsg");
                                         ToastUtils.showShort(alertMsg);
                                         break;
-                                    case 1:
-                                        //扣币并实时显示
-                                        tv_coin_num.setText(String.valueOf(Integer.valueOf(tv_coin_num.getText().toString()) - homeRoomBean.getGamePrice()));
-
-                                        isShowGoBackDialog = true;
-                                        //切换角色
-                                        ILiveRoomManager.getInstance().changeAuthority(Const_Auth_Host, new ILiveCallBack() {
-                                            @Override
-                                            public void onSuccess(Object data) {
-                                                LogUtils.e("切换角色成功");
-                                            }
-
-                                            @Override
-                                            public void onError(String module, int errCode, String errMsg) {
-                                                LogUtils.e("切换角色错误：" + "module=" + module + "，errCode=" + errCode + "，errMsg=" + errMsg);
-                                            }
-                                        });
-                                        JSONObject jsonObjectResData = jsonObjectResBody.optJSONObject("resData");
-                                        String gameId = jsonObjectResData.optString("gameId");
-                                        SPUtils.getInstance().put("gameId", gameId);
+                                    case 1://申请开始游戏成功
                                         startGaming();
+                                        //保存gameId
+                                        JSONObject jsonObjectResData = jsonObjectResBody.optJSONObject("resData");
+                                        setGameId(jsonObjectResData.optString(Constants.GAMEID));
                                         break;
                                     default:
                                         break;
@@ -662,10 +940,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
      * 游戏中
      */
     private void startGaming() {
-        //播放ready_go音效
-        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
-            SoundPoolUtil.getInstance(getApplicationContext()).play(0);
-        }
         //显示操作按钮，隐藏开始抓取和充值按钮
         rl_start_clip_and_recharge.setVisibility(View.GONE);
         rl_operation.setVisibility(View.VISIBLE);
@@ -674,67 +948,91 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         action_btn_top.setEnabled(true);
         action_btn_right.setEnabled(true);
         action_start_clip.setEnabled(true);
-
-        //显示倒计时
+        //显示倒计时，并轮询30s
+        tv_timer.setVisibility(View.VISIBLE);
         mTotalTime = 30;
         mTimer = new Timer();
-        initTimerTask();
+        mTask = new TimerTask() {
+            @Override
+            public void run() {
+                ClipDollDetailActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        --mTotalTime;
+                        tv_timer.setText(String.valueOf(mTotalTime) + "s");
+                        tv_timer.setTextSize(30);
+                        tv_timer.setTextColor(getResources().getColor(R.color.pure_white_color));
+                        if (mTotalTime <= 9) {
+                            tv_timer.setTextSize(40);
+                            tv_timer.setTextColor(getResources().getColor(R.color.seventh_text_color));
+                            //最后5s倒计时
+                            if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
+                                if (mTotalTime == 5 || mTotalTime == 4 || mTotalTime == 3 || mTotalTime == 2 || mTotalTime == 1) {
+                                    SoundPoolUtil.getInstance(getApplicationContext()).play(2);
+                                }
+                            }
+                        }
+                        if (mTotalTime <= 0) {
+                            startGameAfter();
+                        }
+                    }
+                });
+            }
+        };
         mTimer.schedule(mTask, 0, 1000);
-
-        tv_timer.setVisibility(View.VISIBLE);
+        //扣币并实时显示
+        tv_coin_num.setText(String.valueOf(Integer.valueOf(tv_coin_num.getText().toString()) - homeRoomBean.getGamePrice()));
+        //是否弹出正在游戏时退出房间的对话框
+        isShowGoBackDialog = true;
+        //切换角色:由观众切换到游戏
+        resetGameRole(0);
+        //播放ready_go音效
+        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
+            SoundPoolUtil.getInstance(getApplicationContext()).play(0);
+        }
     }
 
     /**
      * 游戏后
      */
     private void startGameAfter() {
-        //开启异常轮询
-        //异常轮询器初始化
-        exceptionTime = 25;
-        exceptionTimer = new Timer();
-        exceptionTimerTask = new TimerTask() {
-            @Override
-            public void run() {
-                --exceptionTime;
-                if (exceptionTime == 0) {
-                    Message message = new Message();
-                    message.what = 55;
-                    handler.sendMessage(message);
-                    exceptionTimer.cancel();
-                    exceptionTimerTask.cancel();
-                }
-            }
-        };
-        exceptionTimer.schedule(exceptionTimerTask, 0, 1000);
-        //显示等待结果的文字
-        tv_waiting_game_result.setVisibility(View.VISIBLE);
-        //下抓的音效
-        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
-            SoundPoolUtil.getInstance(getApplicationContext()).play(3);
-        }
         //调取服务器的下抓接口
-        handlerWaWa("catch");
+        handlerWaWa(Constants.CATCH);
         //隐藏倒计时，取消倒计时
-        mTimer.cancel();
         tv_timer.setVisibility(View.GONE);
+        //取消30s的倒计时
+        if (EmptyUtils.isNotEmpty(mTimer)) {
+            mTimer.cancel();
+            mTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(mTask)) {
+            mTask.cancel();
+            mTask = null;
+        }
         //不激活操作按钮
         action_start_clip.setEnabled(false);
         action_btn_left.setEnabled(false);
         action_btn_top.setEnabled(false);
         action_btn_right.setEnabled(false);
         action_btn_bottom.setEnabled(false);
-        //定时器，开始轮询结果
+        //显示等待结果的文字
+        tv_waiting_game_result.setVisibility(View.VISIBLE);
+        //下抓的音效
+        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
+            SoundPoolUtil.getInstance(getApplicationContext()).play(3);
+        }
+        //开始轮询结果
         gameResultTimer = new Timer();
-        gameResultTimer.schedule(new TimerTask() {
+        gameResultTimerTask = new TimerTask() {
             @Override
             public void run() {
-                ClipDollDetailActivity.this.runOnUiThread(new Runnable() {
+                runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         OkHttpUtils.post()
                                 .url(Constants.getGameResultUrl())
                                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                                .addParams("gameId", SPUtils.getInstance().getString("gameId"))
+                                .addParams(Constants.GAMEID, getGameId())
                                 .build()
                                 .execute(new StringCallback() {
                                     @Override
@@ -757,38 +1055,55 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                 switch (success) {
                                                     case 0:
                                                         String alertMsg = jsonObjectResBody.optString("alertMsg");
-                                                        ToastUtils.showShort("查询结果失败");
+                                                        ToastUtils.showShort("查询结果失败:" + alertMsg);
+                                                        if (EmptyUtils.isNotEmpty(gameResultTimer)) {
+                                                            gameResultTimer.cancel();
+                                                            gameResultTimer = null;
+                                                        }
+                                                        if (EmptyUtils.isNotEmpty(gameResultTimerTask)) {
+                                                            gameResultTimerTask.cancel();
+                                                            gameResultTimerTask = null;
+                                                        }
+                                                        beforeStartGame();
                                                         break;
                                                     case 1:
                                                         JSONObject jsonObjectResData = jsonObjectResBody.optJSONObject("resData");
                                                         int result = jsonObjectResData.optInt("result");
                                                         switch (result) {
                                                             case -1:
-
+                                                                //查询中...
                                                                 break;
                                                             case 0:
                                                                 //没抓中
-                                                                gameResultTimer.cancel();
-                                                                gameResultTimer = null;
+                                                                if (EmptyUtils.isNotEmpty(gameResultTimer)) {
+                                                                    gameResultTimer.cancel();
+                                                                    gameResultTimer = null;
+                                                                }
+                                                                if (EmptyUtils.isNotEmpty(gameResultTimerTask)) {
+                                                                    gameResultTimerTask.cancel();
+                                                                    gameResultTimerTask = null;
+                                                                }
+                                                                showDialogs(2, false);
+                                                                beforeStartGame();
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(5);
                                                                 }
-                                                                showResultDialog(false);
-                                                                beforeStartGame();
-                                                                //隐藏等待结果的文字
-                                                                tv_waiting_game_result.setVisibility(View.GONE);
                                                                 break;
                                                             case 1:
                                                                 //抓中
-                                                                gameResultTimer.cancel();
-                                                                gameResultTimer = null;
+                                                                if (EmptyUtils.isNotEmpty(gameResultTimer)) {
+                                                                    gameResultTimer.cancel();
+                                                                    gameResultTimer = null;
+                                                                }
+                                                                if (EmptyUtils.isNotEmpty(gameResultTimerTask)) {
+                                                                    gameResultTimerTask.cancel();
+                                                                    gameResultTimerTask = null;
+                                                                }
+                                                                showDialogs(2, true);
+                                                                beforeStartGame();
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(4);
                                                                 }
-                                                                showResultDialog(true);
-                                                                beforeStartGame();
-                                                                //隐藏等待结果的文字
-                                                                tv_waiting_game_result.setVisibility(View.GONE);
                                                                 break;
                                                             default:
                                                                 break;
@@ -809,122 +1124,234 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     }
                 });
             }
-        }, 0, 1000);
+        };
+        gameResultTimer.schedule(gameResultTimerTask, 0, 1000);
+        //开启异常轮询
+        exceptionTime = 20;
+        exceptionTimer = new Timer();
+        exceptionTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        --exceptionTime;
+                        if (exceptionTime == 0) {
+                            beforeStartGame();
+                            if (EmptyUtils.isNotEmpty(exceptionTimer)) {
+                                exceptionTimer.cancel();
+                                exceptionTimer = null;
+                            }
+                            if (EmptyUtils.isNotEmpty(exceptionTimerTask)) {
+                                exceptionTimerTask.cancel();
+                                exceptionTimerTask = null;
+                            }
+                        }
+                    }
+                });
+            }
+        };
+        exceptionTimer.schedule(exceptionTimerTask, 0, 1000);
     }
 
-    private void showResultDialog(boolean isClip) {
-        beforeStartGame();
-        if (isClip) {
-            clipYesPopupWindow = new ClipYesPopupWindow(this, new ClipYesPopupWindow.ClipYesPopupNumListener() {
-                @Override
-                public void onCancelClicked() {
-                    tryAgingYesTimer.cancel();
-                    gameOver();
-                    //                    beforeStartGame();
-                }
+    /**
+     * 结束游戏
+     */
+    private void gameOver() {
+        //是否弹出正在游戏时退出房间的对话框
+        isShowGoBackDialog = false;
+        //切换角色
+        resetGameRole(1);
+        //释放资源
+        releaseResource();
+        //调用结束游戏接口
+        OkHttpUtils.post()
+                .url(Constants.getGameOverUrl())
+                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
+                .build()
+                .execute(new StringCallback() {
+                    @Override
+                    public void onError(Call call, Exception e, int id) {
+                        LogUtils.e(e.toString());
+                    }
 
-                @Override
-                public void onGoToInviteClicked() {
-                    tryAgingYesTimer.cancel();
-                    gameOver();
-                    //                    beforeStartGame();
-                    gotoPager(InvitePrizeFragment.class, null);
-                }
+                    @Override
+                    public void onResponse(String response, int id) {
+                    }
+                });
+    }
 
-                @Override
-                public void onTryAgingClicked() {
-                    tryAgingYesTimer.cancel();
-                    exceptionTimer.cancel();
-                    exceptionTimerTask.cancel();
-                    beforeStartGame();
-                    requestBeginGame();
-                }
-            });
-            clipYesPopupWindow.initView();
-            clipYesPopupWindow.showAtLocation(view, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0);
-            clipYesPopupWindow.setOutsideTouchable(false);
-
-            final Button btn_try_aging = (Button) clipYesPopupWindow.getContentView().findViewById(R.id.btn_try_aging);
-            tryAgingYesTimer = new Timer();
-            tryAgingYesTimer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    ClipDollDetailActivity.this.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            --tryAgingTotalTime;
-                            btn_try_aging.setText("再来一局（" + tryAgingTotalTime + "）");
-                            if (tryAgingTotalTime == 0) {
-                                clipYesPopupWindow.dismiss();
-                                tryAgingYesTimer.cancel();
-                                //                                beforeStartGame();
-                                gameOver();
-                            }
-                            if (tryAgingTotalTime < 0) {
-                                tryAgingYesTimer = null;
-                                return;
-                            }
-                        }
-                    });
-                }
-            }, 0, 1000);
-        } else {
-            clipNoPopupWindow = new ClipNoPopupWindow(this, new ClipNoPopupWindow.ClipNoListener() {
-                @Override
-                public void onCancelClicked() {
-                    tryAgingNoTimer.cancel();
-                    gameOver();
-                    //                    beforeStartGame();
-                }
-
-                @Override
-                public void onGoToInviteClicked() {
-                    tryAgingNoTimer.cancel();
-                    gameOver();
-                    //                    beforeStartGame();
-                    gotoPager(InvitePrizeFragment.class, null);
-                }
-
-                @Override
-                public void onTryAgingClicked() {
-                    tryAgingNoTimer.cancel();
-                    exceptionTimer.cancel();
-                    exceptionTimerTask.cancel();
-                    beforeStartGame();
-                    requestBeginGame();
-                }
-            });
-            clipNoPopupWindow.initView();
-            clipNoPopupWindow.showAtLocation(view, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0);
-            clipNoPopupWindow.setOutsideTouchable(false);
-
-            final Button btn_try_aging = (Button) clipNoPopupWindow.getContentView().findViewById(R.id.btn_try_aging);
-            tryAgingNoTimer = new Timer();
-            tryAgingNoTimer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    ClipDollDetailActivity.this.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            --tryAgingTotalTime;
-                            btn_try_aging.setText("再来一局（" + tryAgingTotalTime + "）");
-                            if (tryAgingTotalTime == 0) {
-                                clipNoPopupWindow.dismiss();
-                                tryAgingNoTimer.cancel();
-                                //                                beforeStartGame();
-                                gameOver();
-                            }
-                            if (tryAgingTotalTime < 0) {
-                                tryAgingNoTimer = null;
-                                return;
-                            }
-                        }
-                    });
-                }
-            }, 0, 1000);
+    /**
+     * 释放从申请开始游戏到结束游戏的资源
+     */
+    private void releaseResource() {
+        if (EmptyUtils.isNotEmpty(mTimer)) {
+            mTimer.cancel();
+            mTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(mTask)) {
+            mTask.cancel();
+            mTask = null;
+        }
+        if (EmptyUtils.isNotEmpty(gameResultTimer)) {
+            gameResultTimer.cancel();
+            gameResultTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(gameResultTimerTask)) {
+            gameResultTimerTask.cancel();
+            gameResultTimerTask = null;
+        }
+        if (EmptyUtils.isNotEmpty(exceptionTimer)) {
+            exceptionTimer.cancel();
+            exceptionTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(exceptionTimerTask)) {
+            exceptionTimerTask.cancel();
+            exceptionTimerTask = null;
+        }
+        if (EmptyUtils.isNotEmpty(tryAgingTimer)) {
+            tryAgingTimer.cancel();
+            tryAgingTimer = null;
+        }
+        if (EmptyUtils.isNotEmpty(tryAgingTimerTask)) {
+            tryAgingTimerTask.cancel();
+            tryAgingTimerTask = null;
         }
     }
 
+    /**
+     * 弹出对话框
+     *
+     * @param flag
+     * @param isClip 是否抓中
+     */
+    private void showDialogs(int flag, boolean isClip) {
+        switch (flag) {
+            case 0:
+                //加入房间失败
+                AlertDialog.Builder builder0 = new AlertDialog.Builder(this, R.style.AlertDialog_Logout);
+                View view0 = View.inflate(this, R.layout.dialog_join_room_fail_view, null);
+                builder0.setView(view0);
+                final AlertDialog alertDialog0 = builder0.create();
+                alertDialog0.show();
+                //设置对话框的大小
+                alertDialog0.getWindow().setLayout(SizeUtils.dp2px(340), LinearLayout.LayoutParams.WRAP_CONTENT);
+                //监听事件
+                view0.findViewById(R.id.btn_out_room).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog0.dismiss();
+                        goBack();
+                    }
+                });
+                view0.findViewById(R.id.btn_report).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        releaseResource();
+                        goBack();
+                        ToastUtils.showShort("反馈成功！我们将尽快处理。");
+                        //上报故障
+                        feedBackPostServer();
+                        alertDialog0.dismiss();
+                    }
+                });
+                alertDialog0.setCanceledOnTouchOutside(false);
+                break;
+            case 1:
+                //游戏中退出房间的对话框
+                AlertDialog.Builder builder1 = new AlertDialog.Builder(this, R.style.AlertDialog_Logout);
+                View view1 = View.inflate(this, R.layout.dialog_out_room_view, null);
+                builder1.setView(view1);
+                final AlertDialog alertDialog1 = builder1.create();
+                alertDialog1.show();
+                //设置对话框的大小
+                alertDialog1.getWindow().setLayout(SizeUtils.dp2px(350), LinearLayout.LayoutParams.WRAP_CONTENT);
+                //监听事件
+                view1.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog1.dismiss();
+                    }
+                });
+                view1.findViewById(R.id.btn_make_sure).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog1.dismiss();
+                        //一定要调用释放资源
+                        releaseResource();
+                        goBack();
+                    }
+                });
+                break;
+            case 2:
+                //结果对话框
+                tryAgingTime = 10;
+                clipDollResultPopupWindow = new ClipDollResultPopupWindow(this, new ClipDollResultPopupWindow.ClipYesPopupNumListener() {
+                    @Override
+                    public void onCancelClicked() {
+                        gameOver();
+                    }
+
+                    @Override
+                    public void onGoToInviteClicked() {
+                        gameOver();
+                        gotoPager(InvitePrizeFragment.class, null);
+                    }
+
+                    @Override
+                    public void onTryAgingClicked() {
+                        releaseResource();
+                        requestBeginGame();
+                    }
+                });
+                clipDollResultPopupWindow.initView();
+                clipDollResultPopupWindow.showAtLocation(view, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0);
+                clipDollResultPopupWindow.setOutsideTouchable(false);
+
+                ImageView iv_clip_doll_result = (ImageView) clipDollResultPopupWindow.getContentView().findViewById(R.id.iv_clip_doll_result);
+                TextView tv_clip_doll_result = (TextView) clipDollResultPopupWindow.getContentView().findViewById(R.id.tv_clip_doll_result);
+                TextView tv_clip_doll_desc = (TextView) clipDollResultPopupWindow.getContentView().findViewById(R.id.tv_clip_doll_desc);
+                if (isClip) {
+                    iv_clip_doll_result.setImageResource(R.drawable.liveroom_image_happy);
+                    tv_clip_doll_result.setText("恭喜你抓到一个宝贝");
+                    tv_clip_doll_desc.setText("已放入您的宝贝库");
+                } else {
+                    iv_clip_doll_result.setImageResource(R.drawable.liveroom_image_dismay);
+                    tv_clip_doll_result.setText("很遗憾！没有抓到哦~");
+                    tv_clip_doll_desc.setText("抓的次数越多，成功率越高");
+                }
+                final Button btn_try_aging = (Button) clipDollResultPopupWindow.getContentView().findViewById(R.id.btn_try_aging);
+                tryAgingTimer = new Timer();
+                tryAgingTimerTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                --tryAgingTime;
+                                btn_try_aging.setText("再来一局（" + tryAgingTime + "）");
+                                if (tryAgingTime == 0) {
+                                    if (EmptyUtils.isNotEmpty(clipDollResultPopupWindow)) {
+                                        clipDollResultPopupWindow.dismiss();
+                                        clipDollResultPopupWindow = null;
+                                    }
+                                    gameOver();
+                                }
+                            }
+                        });
+                    }
+                };
+                tryAgingTimer.schedule(tryAgingTimerTask, 1000, 1000);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * 有画面后的回调
+     */
     @Override
     public void onSubViewCreated() {
         if (arv_root.getViewByIndex(0) != null) { //主摄像头画面
@@ -995,364 +1422,29 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         }
     }
 
-    /**
-     * 可见，可操作
-     */
-    @Override
-    protected void onResume() {
-        super.onResume();
-        LogUtils.e("onResume");
-        //用户加入直播间 计数
-        addUserNumForLiveRoom();
-        ILVLiveManager.getInstance().onResume();
-        if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_MUSIC)) {
-            BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).playMusic();
-        }
-    }
-
-    private void getLiveRoomPlayerNum() {
-        OkHttpUtils.get()
-                .url(Constants.getLiveRoomUserUrl())
-                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .build()
-                .execute(new StringCallback() {
-                    @Override
-                    public void onError(Call call, Exception e, int id) {
-                        LogUtils.e(e.toString());
-                    }
-
-                    @Override
-                    public void onResponse(final String response, int id) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!ClipDollDetailActivity.this.isFinishing()) {
-                                    JSONObject jsonObject = null;
-                                    try {
-                                        jsonObject = new JSONObject(response);
-                                        JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
-                                        int code = jsonObjectResHead.optInt("code");
-                                        String msg = jsonObjectResHead.optString("msg");
-                                        String req = jsonObjectResHead.optString("req");
-                                        JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
-                                        if (code == 1) {
-                                            int success = jsonObjectResBody.optInt("success");
-                                            if (success == 1) {
-                                                JSONObject jsonObjectReq = jsonObjectResBody.optJSONObject("req");
-                                                if (EmptyUtils.isNotEmpty(jsonObjectReq)) {
-                                                    JSONObject jsonObjectUser = jsonObjectReq.optJSONObject("user");
-                                                    if (EmptyUtils.isNotEmpty(jsonObjectUser)) {
-                                                        ll_live_room_player.setVisibility(View.VISIBLE);
-                                                        String headImg = jsonObjectUser.optString("headImg");
-                                                        Glide.with(ClipDollDetailActivity.this)
-                                                                .load(headImg)
-                                                                .placeholder(R.drawable.wawa_default_user)
-                                                                .error(R.drawable.wawa_default_user)
-                                                                .into(iv_live_room_player);
-                                                        String nickName = jsonObjectUser.optString("nickName");
-                                                        tv_live_room_player_name.setText(nickName);
-                                                    } else {
-                                                        ll_live_room_player.setVisibility(View.GONE);
-                                                    }
-                                                    JSONArray jsonArrayUserList = jsonObjectReq.optJSONArray("userList");
-                                                    if (EmptyUtils.isNotEmpty(jsonArrayUserList)) {
-                                                        Gson gson = new Gson();
-                                                        ArrayList<LiveRoomUserBean> liveRoomUserBeanArrayList = gson.fromJson(jsonArrayUserList.toString(), new TypeToken<ArrayList<LiveRoomUserBean>>() {
-                                                        }.getType());
-                                                        if (liveRoomUserBeanArrayList.size() != 0) {
-                                                            rl_live_room_user.setVisibility(View.VISIBLE);
-                                                            int userNum = jsonObjectReq.optInt("userNum");
-                                                            tv_user_num.setText(userNum + "人在线");
-                                                            int user_size = liveRoomUserBeanArrayList.size();
-                                                            switch (user_size) {
-                                                                case 1:
-                                                                    iv_user_1.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_1);
-                                                                    iv_user_2.setVisibility(View.GONE);
-                                                                    iv_user_3.setVisibility(View.GONE);
-                                                                    iv_user_4.setVisibility(View.GONE);
-                                                                    break;
-                                                                case 2:
-                                                                    iv_user_1.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_1);
-                                                                    iv_user_2.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_2);
-                                                                    iv_user_3.setVisibility(View.GONE);
-                                                                    iv_user_4.setVisibility(View.GONE);
-                                                                    break;
-                                                                case 3:
-                                                                    iv_user_1.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_1);
-                                                                    iv_user_2.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_2);
-                                                                    iv_user_3.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(2).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_3);
-                                                                    iv_user_4.setVisibility(View.GONE);
-                                                                    break;
-                                                                case 4:
-                                                                    iv_user_1.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(0).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_1);
-                                                                    iv_user_2.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(1).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_2);
-                                                                    iv_user_3.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(2).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_3);
-                                                                    iv_user_4.setVisibility(View.VISIBLE);
-                                                                    Glide.with(ClipDollDetailActivity.this)
-                                                                            .load(liveRoomUserBeanArrayList.get(3).getHeadImg())
-                                                                            .placeholder(R.drawable.avatar)
-                                                                            .error(R.drawable.avatar)
-                                                                            .into(iv_user_4);
-                                                                    break;
-                                                                default:
-                                                                    break;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
-                                            ToastUtils.showShort("请求数据失败:" + msg);
-                                        }
-                                    } catch (JSONException e) {
-                                        e.printStackTrace();
-                                    }
-                                }
-                            }
-                        });
-                    }
-                });
-    }
+    //==============================================固定============================================
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        LogUtils.e("onPause");
-        ILVLiveManager.getInstance().onPause();
-    }
-
-    /**
-     * 不可见，不可操作
-     */
-    @Override
-    protected void onStop() {
-        LogUtils.e("onStop");
-        if (EmptyUtils.isNotEmpty(roomStateTimer)) {
-            roomStateTimer.cancel();
-            roomStateTimer = null;//取消房间的状态轮询
-            roomStateTimerTask.cancel();
-            roomStateTimerTask = null;
-        }
-        if (EmptyUtils.isNotEmpty(playerNumTimer)) {
-            playerNumTimer.cancel();
-        }
-        super.onStop();
-        //用户退出直播间 计数
-        removeUserNumForLiveRoom();
-        //停止播放背景音乐
-        BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).stopMusic();
-    }
-
-    private void removeUserNumForLiveRoom() {
-        OkHttpUtils.get()
-                .url(Constants.getRemoveUserForLiveRoomUrl())
-                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .build()
-                .execute(new StringCallback() {
-                    @Override
-                    public void onError(Call call, Exception e, int id) {
-                        LogUtils.e(e.toString());
-                    }
-
-                    @Override
-                    public void onResponse(String response, int id) {
-                        JSONObject jsonObject = null;
-                        try {
-                            jsonObject = new JSONObject(response);
-                            JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
-                            int code = jsonObjectResHead.optInt("code");
-                            String msg = jsonObjectResHead.optString("msg");
-                            String req = jsonObjectResHead.optString("req");
-                            JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
-                            if (code == 1) {
-                                int success = jsonObjectResBody.optInt("success");
-                                if (success == 1) {
-                                    LogUtils.e("用户退出计数成功");
-                                }
-                            } else {
-                                LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
-                                ToastUtils.showShort("请求数据失败:" + msg);
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-    }
-
-    @Override
-    protected void onDestroy() {
-        LogUtils.e("onDestroy");
-        ILVLiveManager.getInstance().onDestory();
-        releaseResource();
-        Glide.with(getApplicationContext()).pauseRequests();
-        BackgroundMusicPlayerUtil.getInstance(getApplicationContext()).stopMusic();
-        super.onDestroy();
-    }
-
-    @Override
-    public void goBack() {
-        super.goBack();
-    }
-
-    /**
-     * 释放资源
-     */
-    private void releaseResource() {
-        if (EmptyUtils.isNotEmpty(clipYesPopupWindow)) {
-            clipYesPopupWindow.dismiss();
-        }
-        if (EmptyUtils.isNotEmpty(clipNoPopupWindow)) {
-            clipNoPopupWindow.dismiss();
-        }
-        if (EmptyUtils.isNotEmpty(gameResultTimer)) {
-            gameResultTimer.cancel();
-        }
-        if (EmptyUtils.isNotEmpty(roomStateTimer)) {
-            roomStateTimer.cancel();
-        }
-        if (EmptyUtils.isNotEmpty(mTimer)) {
-            mTimer.cancel();
-        }
-        if (EmptyUtils.isNotEmpty(tryAgingYesTimer)) {
-            tryAgingYesTimer.cancel();
-        }
-        if (EmptyUtils.isNotEmpty(tryAgingNoTimer)) {
-            tryAgingNoTimer.cancel();
-        }
-        if (EmptyUtils.isNotEmpty(playerNumTimer)) {
-            playerNumTimer.cancel();
-        }
-    }
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-            if (isShowGoBackDialog) {
-                showGoBackDialog();
+    public void onItemClick(Object data, int position) {
+        if (data.getClass().getSimpleName().equals("LiveRoomLuckyUserBean")) {
+            LiveRoomLuckyUserBean liveRoomLuckyUserBean = (LiveRoomLuckyUserBean) data;
+            if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBean)) {
+                LiveRoomLuckyUserBean.UserBean userBean = liveRoomLuckyUserBean.getUser();
+                if (EmptyUtils.isNotEmpty(userBean)) {
+                    //                    DataManager.getInstance().setData1(userBean);
+                    //                    gotoPager(GuestStateFragment.class, null);
+                }
             }
         }
-        return super.onKeyDown(keyCode, event);
-    }
-
-    private void gameOver() {
-        isShowGoBackDialog = false;
-        exceptionTimer.cancel();
-        exceptionTimerTask.cancel();
-        ILiveRoomManager.getInstance().changeAuthority(Const_Auth_Member, new ILiveCallBack() {
-            @Override
-            public void onSuccess(Object data) {
-                LogUtils.e("切换角色成功");
-            }
-
-            @Override
-            public void onError(String module, int errCode, String errMsg) {
-                LogUtils.e("切换角色错误：" + "module=" + module + "，errCode=" + errCode + "，errMsg=" + errMsg);
-            }
-        });
-        OkHttpUtils.post()
-                .url(Constants.getGameOverUrl())
-                .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .build()
-                .execute(new StringCallback() {
-                    @Override
-                    public void onError(Call call, Exception e, int id) {
-                        LogUtils.e(e.toString());
-                    }
-
-                    @Override
-                    public void onResponse(String response, int id) {
-                        LogUtils.e(response);
-                    }
-                });
-    }
-
-    private void initTimerTask() {
-        mTask = new TimerTask() {
-            @Override
-            public void run() {
-                ClipDollDetailActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        --mTotalTime;
-                        tv_timer.setText(String.valueOf(mTotalTime) + "s");
-                        tv_timer.setTextSize(30);
-                        tv_timer.setTextColor(getResources().getColor(R.color.pure_white_color));
-                        if (mTotalTime <= 9) {
-                            tv_timer.setTextSize(40);
-                            tv_timer.setTextColor(getResources().getColor(R.color.seventh_text_color));
-                            //最后5s倒计时
-                            if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
-                                if (mTotalTime == 5 || mTotalTime == 4 || mTotalTime == 3 || mTotalTime == 2 || mTotalTime == 1) {
-                                    SoundPoolUtil.getInstance(getApplicationContext()).play(2);
-                                }
-                            }
-                        }
-                        if (mTotalTime <= 0) {
-                            startGameAfter();
-                        }
-                    }
-                });
-            }
-        };
     }
 
     private void handlerWaWa(String oper) {
         OkHttpUtils.post()
                 .url(Constants.getPlayGameUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams("gameId", SPUtils.getInstance().getString("gameId"))
+                .addParams(Constants.GAMEID, getGameId())
                 .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .addParams("oper", oper)
+                .addParams(Constants.OPER, oper)
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -1362,7 +1454,7 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
 
                     @Override
                     public void onResponse(String response, int id) {
-                        LogUtils.e(response);
+
                     }
                 });
     }
@@ -1374,7 +1466,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             switch (v.getId()) {
                 case R.id.action_btn_left:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("left");
+                        handlerWaWa(Constants.LEFT);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1382,7 +1475,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_right:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("right");
+                        handlerWaWa(Constants.RIGHT);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1390,7 +1484,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_top:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("down");
+                        handlerWaWa(Constants.DOWN);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1398,7 +1493,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_bottom:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("up");
+                        handlerWaWa(Constants.UP);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1412,7 +1508,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
             switch (v.getId()) {
                 case R.id.action_btn_left:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("up");
+                        handlerWaWa(Constants.UP);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1420,7 +1517,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_right:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("down");
+                        handlerWaWa(Constants.DOWN);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1428,7 +1526,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_top:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("left");
+                        handlerWaWa(Constants.LEFT);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1436,7 +1535,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                     break;
                 case R.id.action_btn_bottom:
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        handlerWaWa("right");
+                        handlerWaWa(Constants.RIGHT);
+                        //如果开启了音效，就播放音效
                         if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                             SoundPoolUtil.getInstance(getApplicationContext()).play(1);
                         }
@@ -1450,71 +1550,52 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
     }
 
     /**
-     * 游戏中退出房间的对话框
+     * 切换角色
+     *
+     * @param flag
      */
-    private void showGoBackDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialog_Logout);
-        View view = View.inflate(this, R.layout.dialog_out_room_view, null);
-        builder.setView(view);
-        final AlertDialog alertDialog = builder.create();
-        alertDialog.show();
-        //设置对话框的大小
-        alertDialog.getWindow().setLayout(SizeUtils.dp2px(350), LinearLayout.LayoutParams.WRAP_CONTENT);
-        //监听事件
-        view.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                alertDialog.dismiss();
-            }
-        });
-        view.findViewById(R.id.btn_make_sure).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                alertDialog.dismiss();
-                releaseResource();
-                goBack();
-            }
-        });
+    private void resetGameRole(int flag) {
+        switch (flag) {
+            case 0:
+                //由观众切换到游戏
+                ILiveRoomManager.getInstance().changeAuthority(Const_Auth_Host, new ILiveCallBack() {
+                    @Override
+                    public void onSuccess(Object data) {
+                    }
+
+                    @Override
+                    public void onError(String module, int errCode, String errMsg) {
+                        LogUtils.e("切换角色错误：" + "module=" + module + "，errCode=" + errCode + "，errMsg=" + errMsg);
+                    }
+                });
+                break;
+            case 1:
+                //由游戏切换到观众
+                ILiveRoomManager.getInstance().changeAuthority(Const_Auth_Member, new ILiveCallBack() {
+                    @Override
+                    public void onSuccess(Object data) {
+                    }
+
+                    @Override
+                    public void onError(String module, int errCode, String errMsg) {
+                        LogUtils.e("切换角色错误：" + "module=" + module + "，errCode=" + errCode + "，errMsg=" + errMsg);
+                    }
+                });
+                break;
+            default:
+                break;
+        }
     }
 
     /**
-     * 加入房间失败的对话框
+     * 上报故障
      */
-    private void showJoinRoomFailDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialog_Logout);
-        View view = View.inflate(this, R.layout.dialog_join_room_fail_view, null);
-        builder.setView(view);
-        final AlertDialog alertDialog = builder.create();
-        alertDialog.show();
-        //设置对话框的大小
-        alertDialog.getWindow().setLayout(SizeUtils.dp2px(340), LinearLayout.LayoutParams.WRAP_CONTENT);
-        //监听事件
-        view.findViewById(R.id.btn_out_room).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                alertDialog.dismiss();
-                goBack();
-            }
-        });
-        view.findViewById(R.id.btn_report).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                releaseResource();
-                goBack();
-                ToastUtils.showShort("反馈成功！我们将尽快处理。");
-                feedBackPostServer();
-                alertDialog.dismiss();
-            }
-        });
-        alertDialog.setCanceledOnTouchOutside(false);
-    }
-
     private void feedBackPostServer() {
         OkHttpUtils.get()
                 .url(Constants.getFeedBackPostServerUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
                 .addParams(Constants.GROUPID, homeRoomBean.getGroupId())
-                .addParams(Constants.CONTENT, "加入房间失败")
+                .addParams(Constants.CONTENT, Constants.JOIN_ROOM_FAIL)
                 .addParams(Constants.TYPE, String.valueOf(0))
                 .build()
                 .execute(new StringCallback() {
@@ -1525,25 +1606,21 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
 
                     @Override
                     public void onResponse(String response, int id) {
-                        LogUtils.e(response);
                     }
                 });
-    }
-
-    private void regToWx() {
-        api = WXAPIFactory.createWXAPI(this, Constants.APP_ID, true);
-        api.registerApp(Constants.APP_ID);
     }
 
     private void showSharePlatformPopWindow() {
         SharePlatformPopupWindow sharePlatformPopWindow = new SharePlatformPopupWindow(ClipDollDetailActivity.this, new SharePlatformPopupWindow.SharePlatformListener() {
             @Override
             public void onWeChatClicked() {
+                //微信好友分享
                 weChatShare(0);
             }
 
             @Override
             public void onWechatMomentsClicked() {
+                //微信朋友圈分享
                 weChatShare(1);
             }
 
@@ -1577,17 +1654,19 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
         api.sendReq(req);
     }
 
-    @Override
-    public void onItemClick(Object data, int position) {
-        if (data.getClass().getSimpleName().equals("LiveRoomLuckyUserBean")) {
-            LiveRoomLuckyUserBean liveRoomLuckyUserBean = (LiveRoomLuckyUserBean) data;
-            if (EmptyUtils.isNotEmpty(liveRoomLuckyUserBean)) {
-                LiveRoomLuckyUserBean.UserBean userBean = liveRoomLuckyUserBean.getUser();
-                if (EmptyUtils.isNotEmpty(userBean)) {
-                    //                    DataManager.getInstance().setData1(liveRoomLuckyUserBean.getUser());
-                    //                    gotoPager(GuestStateFragment.class, null);
-                }
-            }
-        }
+    /**
+     * 注册微信
+     */
+    private void regToWx() {
+        api = WXAPIFactory.createWXAPI(this, Constants.APP_ID, true);
+        api.registerApp(Constants.APP_ID);
+    }
+
+    public String getGameId() {
+        return gameId;
+    }
+
+    public void setGameId(String gameId) {
+        this.gameId = gameId;
     }
 }

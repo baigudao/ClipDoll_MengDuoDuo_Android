@@ -21,7 +21,7 @@ import com.meng.duo.clip.doll.R;
  * E-mail:971060378@qq.com
  */
 
-public class ClipYesPopupWindow extends PopupWindow implements View.OnClickListener {
+public class ClipDollResultPopupWindow extends PopupWindow implements View.OnClickListener {
 
     private ClipYesPopupNumListener listener;
     protected Context context;
@@ -35,9 +35,9 @@ public class ClipYesPopupWindow extends PopupWindow implements View.OnClickListe
         void onTryAgingClicked();
     }
 
-    public ClipYesPopupWindow(Context context, ClipYesPopupNumListener listener) {
+    public ClipDollResultPopupWindow(Context context, ClipYesPopupNumListener listener) {
         super(context);
-        setContentView(LayoutInflater.from(context).inflate(R.layout.clip_yes_popup_window, null));
+        setContentView(LayoutInflater.from(context).inflate(R.layout.clip_doll_result_popup_window, null));
         this.listener = listener;
         this.context = context;
         // initView(morePopup, type);
@@ -134,7 +134,7 @@ public class ClipYesPopupWindow extends PopupWindow implements View.OnClickListe
             }
 
             public void onAnimationEnd(Animator animation) {
-                ClipYesPopupWindow.super.dismiss();
+                ClipDollResultPopupWindow.super.dismiss();
             }
         });
         fadeAnim.start();
