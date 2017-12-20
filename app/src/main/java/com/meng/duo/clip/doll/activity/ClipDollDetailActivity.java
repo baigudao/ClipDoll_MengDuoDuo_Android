@@ -887,7 +887,6 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
      * 申请开始游戏
      */
     private void requestBeginGame() {
-        //释放以前
         OkHttpUtils.post()
                 .url(Constants.getApplyBeginGameUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))

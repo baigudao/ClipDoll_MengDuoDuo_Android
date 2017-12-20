@@ -58,8 +58,8 @@ public class LoginActivity extends BaseActivity implements View.OnClickListener,
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.ll_weixin_login:
-                //                wxLogin();
-                test();
+                wxLogin();
+                //                test();
                 break;
             case R.id.tv_user_protocol:
                 gotoPager(UserProtocolFragment.class, null);
