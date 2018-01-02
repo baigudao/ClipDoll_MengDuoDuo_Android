@@ -192,7 +192,7 @@
             android:layout_marginLeft="30dp"
             android:layout_marginRight="30dp"
             android:layout_marginTop="40dp"
-            android:text="输入好友的邀请码，即可获赠20个游戏币"
+            android:text="输入好友的邀请码，即可获赠30个娃娃币"
             android:textColor="@color/main_text_color"
             android:textSize="16sp"/>
 

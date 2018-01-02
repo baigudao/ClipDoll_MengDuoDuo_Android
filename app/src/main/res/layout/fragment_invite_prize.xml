@@ -178,7 +178,7 @@
             android:layout_marginLeft="30dp"
             android:layout_marginRight="30dp"
             android:layout_marginTop="40dp"
-            android:text="邀请好友完成注册，你和朋友都将获得20个游戏币，可累加。邀请越多获赠越多，最多400币。"
+            android:text="邀请好友注册，并成功登录游戏填写邀请码，邀请人和被邀请人可各获得30娃娃币，可累加，邀请人数上限100人。"
             android:textColor="@color/main_text_color"
             android:textSize="16sp"/>
 

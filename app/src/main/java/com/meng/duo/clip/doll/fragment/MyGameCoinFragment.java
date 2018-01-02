@@ -101,7 +101,7 @@ public class MyGameCoinFragment extends BaseFragment {
         changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
         changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
         changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-        tv_recharge_num.setText(String.valueOf(10));
+        tv_recharge_num.setText(String.valueOf(10) + "元");
         priceId = 1;
         //注册微信支付
         regToWx();
@@ -134,8 +134,6 @@ public class MyGameCoinFragment extends BaseFragment {
         super.initData();
         //是否首充
         isFirstRecharge();
-        //获取剩余币
-        getBalance();
     }
 
     @Override
@@ -146,6 +144,40 @@ public class MyGameCoinFragment extends BaseFragment {
                 break;
             case R.id.tv_cost_record:
                 gotoPager(SpendCoinRecordFragment.class, null);
+                //测试数据
+                //                priceId = 13;
+                //                OkHttpUtils.post()
+                //                        .url(Constants.getWeChatPayUrl())
+                //                        .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
+                //                        .addParams(Constants.PRICEID, String.valueOf(13))
+                //                        .build()
+                //                        .execute(new StringCallback() {
+                //                            @Override
+                //                            public void onError(Call call, Exception e, int id) {
+                //                                LogUtils.e(e.toString());
+                //                            }
+                //
+                //                            @Override
+                //                            public void onResponse(String response, int id) {
+                //                                JSONObject jsonObject = null;
+                //                                try {
+                //                                    jsonObject = new JSONObject(response);
+                //                                    JSONObject jsonObjectResHead = jsonObject.optJSONObject("resHead");
+                //                                    int code = jsonObjectResHead.optInt("code");
+                //                                    String msg = jsonObjectResHead.optString("msg");
+                //                                    String req = jsonObjectResHead.optString("req");
+                //                                    JSONObject jsonObjectResBody = jsonObject.optJSONObject("resBody");
+                //                                    if (code == 1) {
+                //                                        handlerWeChatPayData(jsonObjectResBody);
+                //                                    } else {
+                //                                        LogUtils.e("请求数据失败：" + msg + "-" + code + "-" + req);
+                //                                        ToastUtils.showShort("请求数据失败:" + msg);
+                //                                    }
+                //                                } catch (JSONException e) {
+                //                                    e.printStackTrace();
+                //                                }
+                //                            }
+                //                        });
                 break;
             case R.id.ll_coin_recharge:
                 recharge();//充值
@@ -157,7 +189,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
                 changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
                 changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-                tv_recharge_num.setText(String.valueOf(10));
+                tv_recharge_num.setText(String.valueOf(10) + "元");
                 priceId = 1;
                 break;
             case R.id.rl_id_2:
@@ -167,7 +199,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
                 changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
                 changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-                tv_recharge_num.setText(String.valueOf(20));
+                tv_recharge_num.setText(String.valueOf(20) + "元");
                 priceId = 2;
                 break;
             case R.id.rl_id_3:
@@ -177,7 +209,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
                 changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
                 changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-                tv_recharge_num.setText(String.valueOf(50));
+                tv_recharge_num.setText(String.valueOf(50) + "元");
                 priceId = 3;
                 break;
             case R.id.rl_id_4:
@@ -187,7 +219,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.main_color, tv_id_4, tv_content_4, R.color.pure_white_color);
                 changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
                 changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-                tv_recharge_num.setText(String.valueOf(100));
+                tv_recharge_num.setText(String.valueOf(100) + "元");
                 priceId = 4;
                 break;
             case R.id.rl_id_5:
@@ -197,7 +229,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
                 changeBackgroundColor(rl_id_5, R.color.main_color, tv_id_5, tv_content_5, R.color.pure_white_color);
                 changeBackgroundColor(rl_id_6, R.color.pure_white_color, tv_id_6, tv_content_6, R.color.main_text_color);
-                tv_recharge_num.setText(String.valueOf(300));
+                tv_recharge_num.setText(String.valueOf(300) + "元");
                 priceId = 5;
                 break;
             case R.id.rl_id_6:
@@ -207,7 +239,7 @@ public class MyGameCoinFragment extends BaseFragment {
                 changeBackgroundColor(rl_id_4, R.color.pure_white_color, tv_id_4, tv_content_4, R.color.main_text_color);
                 changeBackgroundColor(rl_id_5, R.color.pure_white_color, tv_id_5, tv_content_5, R.color.main_text_color);
                 changeBackgroundColor(rl_id_6, R.color.main_color, tv_id_6, tv_content_6, R.color.pure_white_color);
-                tv_recharge_num.setText(String.valueOf(500));
+                tv_recharge_num.setText(String.valueOf(500) + "元");
                 priceId = 6;
                 break;
             default:
@@ -222,7 +254,7 @@ public class MyGameCoinFragment extends BaseFragment {
         OkHttpUtils.post()
                 .url(Constants.getWeChatPayUrl())
                 .addParams(Constants.SESSION, SPUtils.getInstance().getString(Constants.SESSION))
-                .addParams("priceId", String.valueOf(priceId))
+                .addParams(Constants.PRICEID, String.valueOf(priceId))
                 .build()
                 .execute(new StringCallback() {
                     @Override
@@ -268,6 +300,72 @@ public class MyGameCoinFragment extends BaseFragment {
                     request.nonceStr = weChatPayParamsBean.getNoncestr();
                     request.timeStamp = String.valueOf(weChatPayParamsBean.getTimestamp());
                     request.sign = weChatPayParamsBean.getSign();
+                    int pay_money = 0;
+                    int get_wawa_coin = 0;
+                    switch (priceId) {
+                        case 1:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 110;
+                            } else {
+                                get_wawa_coin = 200;
+                            }
+                            pay_money = 10;
+                            break;
+                        case 2:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 220;
+                            } else {
+                                get_wawa_coin = 400;
+                            }
+                            pay_money = 20;
+                            break;
+                        case 3:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 550;
+                            } else {
+                                get_wawa_coin = 1000;
+                            }
+                            pay_money = 50;
+                            break;
+                        case 4:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 1100;
+                            } else {
+                                get_wawa_coin = 2000;
+                            }
+                            pay_money = 100;
+                            break;
+                        case 5:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 3300;
+                            } else {
+                                get_wawa_coin = 6000;
+                            }
+                            pay_money = 300;
+                            break;
+                        case 6:
+                            if (isFirstRecharge == 0) {
+                                //不是
+                                get_wawa_coin = 5500;
+                            } else {
+                                get_wawa_coin = 10000;
+                            }
+                            pay_money = 500;
+                            break;
+                        case 13:
+                            get_wawa_coin = 1010;
+                            pay_money = 1;
+                            break;
+                        default:
+                            break;
+                    }
+                    DataManager.getInstance().setData1(pay_money);
+                    DataManager.getInstance().setData2(get_wawa_coin);
                     //发起微信支付
                     api.sendReq(request);
                 }
@@ -325,12 +423,12 @@ public class MyGameCoinFragment extends BaseFragment {
                 tv_content_6.setText("充500元送500币");
                 break;
             case 1:
-                tv_content_1.setText("首充10元送60币");
-                tv_content_2.setText("首充20元送150币");
-                tv_content_3.setText("首充50元送450币");
-                tv_content_4.setText("首充100元送950币");
-                tv_content_5.setText("首充300元送2950币");
-                tv_content_6.setText("首充500元送4950币");
+                tv_content_1.setText("首充10元送100币");
+                tv_content_2.setText("首充20元送200币");
+                tv_content_3.setText("首充50元送500币");
+                tv_content_4.setText("首充100元送1000币");
+                tv_content_5.setText("首充300元送3000币");
+                tv_content_6.setText("首充500元送5000币");
                 break;
             default:
                 break;
@@ -380,63 +478,10 @@ public class MyGameCoinFragment extends BaseFragment {
     @Override
     public void onResume() {
         super.onResume();
-        String recharge_success = (String) DataManager.getInstance().getData1();
-        if (EmptyUtils.isNotEmpty(recharge_success) && recharge_success.equals("RECHARGE_SUCCESS")) {
-            //充值成功
-            String remain_coin_string = tv_remain_coin.getText().toString();
-            int remain_coin = Integer.valueOf(remain_coin_string);
-            int recharge_coin = 0;
-            if (isFirstRecharge == 1) {//是
-                switch (priceId) {
-                    case 1:
-                        recharge_coin = 160;
-                        break;
-                    case 2:
-                        recharge_coin = 350;
-                        break;
-                    case 3:
-                        recharge_coin = 950;
-                        break;
-                    case 4:
-                        recharge_coin = 1950;
-                        break;
-                    case 5:
-                        recharge_coin = 5950;
-                        break;
-                    case 6:
-                        recharge_coin = 9950;
-                        break;
-                    default:
-                        break;
-                }
-            } else if (isFirstRecharge == 0) {//不是
-                switch (priceId) {
-                    case 1:
-                        recharge_coin = 110;
-                        break;
-                    case 2:
-                        recharge_coin = 220;
-                        break;
-                    case 3:
-                        recharge_coin = 550;
-                        break;
-                    case 4:
-                        recharge_coin = 1100;
-                        break;
-                    case 5:
-                        recharge_coin = 3300;
-                        break;
-                    case 6:
-                        recharge_coin = 5500;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            int remain_coin_total = remain_coin + recharge_coin;
-            tv_remain_coin.setText(String.valueOf(remain_coin_total));
-
-            DataManager.getInstance().setData1(null);
-        }
+        //        String recharge_success = (String) DataManager.getInstance().getData1();
+        //        if (EmptyUtils.isNotEmpty(recharge_success) && recharge_success.equals("RECHARGE_SUCCESS")) {
+        //获取剩余币
+        getBalance();
+        //        }
     }
 }

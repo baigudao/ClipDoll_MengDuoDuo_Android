@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.view.KeyEvent;
+import android.view.View;
 
 import com.blankj.utilcode.util.BarUtils;
 import com.meng.duo.clip.doll.BaseApplication;
@@ -24,6 +25,8 @@ public class EmptyActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         BarUtils.setStatusBarColor(EmptyActivity.this, getResources().getColor(R.color.main_color));
         setContentView(R.layout.activity_empty);
+        //设置状态栏文字颜色及图标为深色
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         onNewIntent(getIntent());
     }
 

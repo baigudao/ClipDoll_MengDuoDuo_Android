@@ -22,6 +22,7 @@ public class Constants {
     public static final String INVITECODE = "inviteCode";
     public static final String NICKNAME = "nickName";
     public static final String USERID = "userId";
+    public static final String PRICEID = "priceId";
     public static final String DEVICE_ID = "device_id";
     public static final String MY_USER_INFO = "my_user_info";
     public static final String TLSSIGN = "tlsSign";

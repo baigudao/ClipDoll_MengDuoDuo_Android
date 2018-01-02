@@ -23,7 +23,7 @@ import com.tencent.ilivesdk.ILiveSDK;
 import com.tencent.livesdk.ILVLiveConfig;
 import com.tencent.livesdk.ILVLiveManager;
 import com.umeng.analytics.MobclickAgent;
-import com.umeng.commonsdk.UMConfigure;
+import com.umeng.analytics.game.UMGameAgent;
 import com.zhy.http.okhttp.OkHttpUtils;
 
 import java.util.concurrent.TimeUnit;
@@ -79,8 +79,10 @@ public class BaseApplication extends Application {
         ILVLiveManager.getInstance().init(liveConfig);
 
         //友盟统计
-        MobclickAgent.setScenarioType(this, MobclickAgent.EScenarioType.E_UM_NORMAL);
-        UMConfigure.init(this, UMConfigure.DEVICE_TYPE_PHONE, null);
+        UMGameAgent.setDebugMode(true);//设置输出运行时日志
+        UMGameAgent.init(this);
+        MobclickAgent.setScenarioType(this, MobclickAgent.EScenarioType.E_UM_GAME);
+        MobclickAgent.setSessionContinueMillis(10000);
     }
 
     private void configureOkHttp() {

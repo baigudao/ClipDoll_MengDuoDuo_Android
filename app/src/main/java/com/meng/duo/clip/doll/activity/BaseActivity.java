@@ -12,6 +12,7 @@ import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.WindowManager;
 
 import com.blankj.utilcode.util.LogUtils;
@@ -20,7 +21,7 @@ import com.blankj.utilcode.util.ToastUtils;
 import com.meng.duo.clip.doll.BaseApplication;
 import com.meng.duo.clip.doll.fragment.BaseFragment;
 import com.meng.duo.clip.doll.util.Constants;
-import com.umeng.analytics.MobclickAgent;
+import com.umeng.analytics.game.UMGameAgent;
 
 import java.util.List;
 
@@ -44,6 +45,11 @@ public class BaseActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         //知道当前页面在哪个Activity中
         LogUtils.e("当前页面处于：" + getClass().getSimpleName());
+        //设置状态栏文字颜色及图标为深色
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+
+        UMGameAgent.setDebugMode(true);//设置输出运行时日志
+        UMGameAgent.init(this);
     }
 
     public DisplayMetrics getDisplaymetrics() {
@@ -201,7 +207,7 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
+        UMGameAgent.onResume(this);
         if (!NetworkUtils.isConnected()) {
             ToastUtils.showShort("当前无网络，请开启网络连接！");
         }
@@ -210,6 +216,6 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        MobclickAgent.onPause(this);
+        UMGameAgent.onPause(this);
     }
 }

@@ -59,7 +59,7 @@
                 android:layout_below="@id/tv_id_1"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充10元送60币"
+                android:text="首充10元送100币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 
@@ -92,7 +92,7 @@
                 android:layout_below="@id/tv_id_2"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充20元送150币"
+                android:text="首充20元送200币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 
@@ -124,7 +124,7 @@
                 android:layout_below="@id/tv_id_3"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充50元送450币"
+                android:text="首充50元送500币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 
@@ -164,7 +164,7 @@
                 android:layout_below="@id/tv_id_4"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充100元送950币"
+                android:text="首充100元送1000币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 
@@ -197,7 +197,7 @@
                 android:layout_below="@id/tv_id_5"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充300元送2950币"
+                android:text="首充300元送3000币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 
@@ -229,7 +229,7 @@
                 android:layout_below="@id/tv_id_6"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="5dp"
-                android:text="首充500元送4950币"
+                android:text="首充500元送5000币"
                 android:textColor="@color/main_text_color"
                 android:textSize="11sp"/>
 

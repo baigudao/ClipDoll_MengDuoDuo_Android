@@ -57,6 +57,7 @@ import com.tencent.mm.opensdk.modelmsg.WXMediaMessage;
 import com.tencent.mm.opensdk.modelmsg.WXWebpageObject;
 import com.tencent.mm.opensdk.openapi.IWXAPI;
 import com.tencent.mm.opensdk.openapi.WXAPIFactory;
+import com.umeng.analytics.game.UMGameAgent;
 import com.zhy.http.okhttp.OkHttpUtils;
 import com.zhy.http.okhttp.callback.StringCallback;
 
@@ -920,6 +921,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                         //保存gameId
                                         JSONObject jsonObjectResData = jsonObjectResBody.optJSONObject("resData");
                                         setGameId(jsonObjectResData.optString(Constants.GAMEID));
+                                        //友盟统计关卡
+                                        UMGameAgent.startLevel("level");
                                         break;
                                     default:
                                         break;
@@ -1087,6 +1090,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(5);
                                                                 }
+                                                                //友盟统计关卡
+                                                                UMGameAgent.failLevel("level");
                                                                 break;
                                                             case 1:
                                                                 //抓中
@@ -1103,6 +1108,8 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                                                                 if (!SPUtils.getInstance().getBoolean(Constants.IS_PLAY_BACKGROUND_SOUND)) {
                                                                     SoundPoolUtil.getInstance(getApplicationContext()).play(4);
                                                                 }
+                                                                //友盟统计关卡
+                                                                UMGameAgent.finishLevel("level");
                                                                 break;
                                                             default:
                                                                 break;
@@ -1285,6 +1292,9 @@ public class ClipDollDetailActivity extends BaseActivity implements View.OnClick
                 break;
             case 2:
                 //结果对话框
+                if (this.isFinishing()) {
+                    break;
+                }
                 tryAgingTime = 10;
                 clipDollResultPopupWindow = new ClipDollResultPopupWindow(this, new ClipDollResultPopupWindow.ClipYesPopupNumListener() {
                     @Override
